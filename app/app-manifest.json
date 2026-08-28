@@ -1,0 +1,15 @@
+{
+  "name": "ProtocolX Verify",
+  "url": "https://projectxprotocol.dev",
+  "hook_attributes": {
+    "url": "https://REPLACE-WITH-WORKER-URL/webhook"
+  },
+  "public": false,
+  "default_permissions": {
+    "checks": "write",
+    "contents": "read",
+    "metadata": "read",
+    "pull_requests": "read"
+  },
+  "default_events": ["pull_request", "check_suite"]
+}

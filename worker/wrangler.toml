@@ -1,0 +1,5 @@
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# For anyone deploying with wrangler instead of scripts/deploy.sh — same worker, same shape.
+name = "protocolx-verify"
+main = "src/index.js"
+compatibility_date = "2026-08-01"

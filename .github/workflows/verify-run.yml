@@ -1,0 +1,134 @@
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+#
+# The runner — the muscle behind the ProtocolX Verify GitHub App.
+#
+# The worker (the app's front door) dispatches this workflow with a client repository,
+# a commit, and the ids of the check runs it opened. This job fetches that exact commit
+# with a short-lived installation token, runs the estate's gate engine verbatim
+# (engine/ci/gates.sh — build, digest guard, tests, framework pin, mutation smoke), and
+# writes each gate's verdict back onto the client's commit as a completed check run.
+#
+# Discipline carried over from the estate's own CI:
+#   - Pinned toolchain: a floating Sui version changes what compiles — and what digest
+#     the source builds to — without a line of any repository changing.
+#   - The gates step never hard-fails the job: verdicts are read from the engine's own
+#     output, and a gate that never reported is swept to an explicit failure at the end.
+#     "Never ran" must not read as "passed".
+
+name: Verify run
+
+on:
+  workflow_dispatch:
+    inputs:
+      installation_id:
+        description: GitHub App installation id for the client
+        required: true
+        type: string
+      repository:
+        description: Client repository (owner/name)
+        required: true
+        type: string
+      head_sha:
+        description: Commit to verify
+        required: true
+        type: string
+      check_runs:
+        description: JSON map of gate name to check-run id
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ inputs.repository }}-${{ inputs.head_sha }}
+  cancel-in-progress: false
+
+env:
+  SUI_VERSION: mainnet-v1.77.2
+
+jobs:
+  verify:
+    name: Run the gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mint installation token
+        id: mint
+        env:
+          GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          INSTALLATION_ID: ${{ inputs.installation_id }}
+        run: node runner/mint-token.mjs
+
+      - name: Fetch the client repository at the exact commit
+        env:
+          TOKEN: ${{ steps.mint.outputs.token }}
+        run: |
+          git init -q client
+          cd client
+          git remote add origin "https://x-access-token:${TOKEN}@github.com/${{ inputs.repository }}.git"
+          git fetch --depth 1 origin "${{ inputs.head_sha }}"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Read client configuration
+        id: cfg
+        run: |
+          if [ ! -f client/.protocolx-verify.json ]; then
+            echo "found=0" >> "$GITHUB_OUTPUT"
+            echo "No .protocolx-verify.json in the client repository — will post setup instructions."
+          else
+            PKG=$(node -e 'const c = require("./client/.protocolx-verify.json"); if (typeof c.package !== "string" || c.package === "") { console.error("config has no \"package\" string"); process.exit(1); } console.log(c.package)')
+            echo "found=1" >> "$GITHUB_OUTPUT"
+            echo "package=$PKG" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post setup instructions
+        if: steps.cfg.outputs.found == '0'
+        env:
+          CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          CHECK_RUNS: ${{ inputs.check_runs }}
+        run: node runner/report-gates.mjs setup-needed
+
+      - name: Install Sui CLI (pinned)
+        if: steps.cfg.outputs.found == '1'
+        run: |
+          curl -sSL -o sui.tgz \
+            "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz"
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf sui.tgz -C "$HOME/.local/bin" --strip-components=1 || tar -xzf sui.tgz -C "$HOME/.local/bin"
+          chmod +x "$HOME/.local/bin/sui"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Mark gates in progress
+        if: steps.cfg.outputs.found == '1'
+        env:
+          CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          CHECK_RUNS: ${{ inputs.check_runs }}
+        run: node runner/report-gates.mjs start
+
+      - name: Run the gates
+        if: steps.cfg.outputs.found == '1'
+        run: |
+          # The engine's exit code is deliberately not this step's: verdicts come from its
+          # output, per gate, and the sweep step turns any silence into an explicit failure.
+          bash engine/ci/gates.sh "client/${{ steps.cfg.outputs.package }}" --mutation-limit 5 2>&1 | tee gates.log || true
+
+      - name: Report gate verdicts
+        if: steps.cfg.outputs.found == '1'
+        env:
+          CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          CHECK_RUNS: ${{ inputs.check_runs }}
+        run: node runner/report-gates.mjs report gates.log
+
+      - name: Sweep unfinished check runs
+        if: always()
+        env:
+          CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          CHECK_RUNS: ${{ inputs.check_runs }}
+        run: node runner/report-gates.mjs sweep
