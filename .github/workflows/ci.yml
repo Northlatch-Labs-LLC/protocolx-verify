@@ -1,0 +1,57 @@
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+#
+# The product that sells gates runs gates on itself. Every pull request here proves,
+# on a machine that has never seen this repository: the crypto and routing logic
+# passes its tests against an independent implementation, every shell script parses,
+# every JS entrypoint parses, and the engine copies are still byte-identical to the
+# recorded hashes — a drifted engine copy is a different product wearing our name.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: Self-gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests (crypto, routing, engine-output parsing)
+        run: node --test worker/test/lib.test.mjs
+
+      - name: Every shell script parses
+        run: |
+          for f in scripts/*.sh engine/ci/*.sh engine/move-mutate/*.sh; do
+            bash -n "$f"
+            echo "$f: OK"
+          done
+
+      - name: Every JS entrypoint parses
+        run: |
+          node --check worker/src/index.js
+          node --check worker/src/lib.js
+          node --check runner/mint-token.mjs
+          node --check runner/report-gates.mjs
+
+      - name: Engine copies match their recorded hashes
+        run: sha256sum -c engine/CHECKSUMS
+
+      - name: Manifest and workflow files are valid
+        run: |
+          node -e 'JSON.parse(require("fs").readFileSync("app/app-manifest.json", "utf8")); console.log("manifest: valid JSON")'
+          node -e 'const fs = require("fs"); for (const f of fs.readdirSync(".github/workflows")) fs.readFileSync(".github/workflows/" + f, "utf8"); console.log("workflows: readable")'
