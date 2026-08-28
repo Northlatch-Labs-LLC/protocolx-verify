@@ -97,7 +97,10 @@ for m in ${MUTATIONS[@]+"${MUTATIONS[@]}"}; do
   file="${m%%:*}"; rest="${m#*:}"; line="${rest%%:*}"; text="${rest#*:}"
   cp "$BACKUP_DIR/$(basename "$file")" "$file"
   before="$(hash_of "$file")"
-  sed -i '' "${line}s/.*//" "$file"
+  # awk, not `sed -i`: BSD sed wants `-i ''` and GNU sed reads that '' as the script,
+  # turning the edit expression into a filename. The first CI run of the packaged tool
+  # died exactly there — and the applied-mutation check below caught it, as designed.
+  awk -v n="$line" 'NR==n{print ""; next}{print}' "$file" > "$file.mut" && mv "$file.mut" "$file"
   after="$(hash_of "$file")"
   if [[ "$before" == "$after" ]]; then
     echo "!! mutation applied nothing at $file:$line — stale state, aborting"; exit 1
