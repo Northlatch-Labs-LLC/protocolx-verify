@@ -1,0 +1,30 @@
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+#
+# The door watch. If the front door dies at 3am, something must say so — this is
+# the something. Every six hours (off the hour, deliberately: scheduled jobs pile
+# up on the hour and get delayed), a clean machine knocks on /healthz and demands
+# "ok": true. A failed run is a red workflow and a notification to the org — free
+# alerting with no third-party service, which is the only kind the desk buys.
+
+name: Door watch
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  healthz:
+    name: The door answers, fully configured
+    runs-on: ubuntu-latest
+    steps:
+      - name: Knock
+        run: |
+          BODY=$(curl -sS --max-time 15 https://protocolx-verify.primo9537.workers.dev/healthz) || {
+            echo "THE FRONT DOOR DID NOT ANSWER AT ALL"; exit 1; }
+          echo "$BODY"
+          echo "$BODY" | grep -q '"ok":true' || {
+            echo "THE FRONT DOOR ANSWERED BUT IS NOT HEALTHY — see missing[] above"; exit 1; }

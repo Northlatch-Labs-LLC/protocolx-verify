@@ -60,20 +60,30 @@ app/               REGISTRATION.md (the Owner's card) · app-manifest.json
 - The runner has `contents: read` only; the client repo is fetched read-only at one
   exact commit.
 
-## Status ledger (2026-08-28) — claims, separated
+## Status ledger (updated 2026-08-29, post go-live) — claims, separated
 
-**Verified (ran here):** 7 unit tests pass under `node --test` — webhook HMAC
-accept/reject/tamper, RS256 JWT signature checked against Node's own crypto, PKCS#1
-trap message, event routing, engine-output parsing including skip and silence;
-`bash -n` clean on all shell; engine copies byte-identical to verification-tools
-(SHA-256 compared); the Cloudflare DNS token proven unable to deploy workers (tested,
-not assumed); account id read live from the API.
+**Verified live, in production:** the full loop ran end to end on 2026-08-29 —
+GitHub delivery → signature verification at the deployed worker
+(protocolx-verify.primo9537.workers.dev) → five check runs on the client commit →
+runner dispatch → client repo fetched at the exact sha with a short-lived
+installation token → gate battery → per-gate verdicts posted back. First client:
+`weir` (our own mainnet SocialFi contract). First complete run surfaced two
+assertions no test exercised — an ownership guard among them; both were killed by
+tests the same night and the five-mutation smoke that found them now reports five
+kills (weir commit: "Kill the two survivors the app found on its first run").
+Registration (all seven stations of app/REGISTRATION.md) is COMPLETE. The worker
+is watched by `.github/workflows/healthz.yml` every six hours — a red run is the
+alert. Two first-contact defects were found and fixed live, loudly: a trailing
+byte added by the secret loader (401s, caught in the app's own delivery log) and
+a sed-dialect break in the mutation tool (caught by its own applied-mutation
+guard, which refused to fake a kill).
 
-**Reasoned (correct by reading, not yet executed):** the worker's GitHub calls and the
-runner workflow — they follow the documented API shapes but have not run against a
-live installation, because the app does not exist until the Owner registers it.
+**Unit-verified:** 7 tests under `node --test` (webhook HMAC accept/reject/tamper,
+RS256 JWT checked against an independent implementation, PKCS#1 trap, routing,
+engine-output parsing); engine copies SHA-256-pinned via `engine/CHECKSUMS`,
+enforced by CI on every PR.
 
-**Needs the Owner's hand (app/REGISTRATION.md, seven stations):** Workers-scoped
-Cloudflare token → deploy → create the GitHub App on the org → push this repo + two
-Actions secrets → dispatch token → worker secrets → install on `weir` and open a PR.
-Station 7 is the first end-to-end proof, on our own code.
+**Deliberately not built yet (road 2 — after the first service dollar):**
+billing/metering, multi-tenancy beyond this org, key-distance hardening for
+hostile client repos, and a client-facing dashboard. Until then the app serves
+the estate and demonstrates the sprints (see projectxprotocol.dev/verification).

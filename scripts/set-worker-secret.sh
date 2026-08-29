@@ -38,4 +38,6 @@ process.stdin.on("end", async () => {
   if (!body.success) { console.error("FAILED:", JSON.stringify(body.errors)); process.exit(1); }
   console.log(`secret ${secretName}: set`);
 });
-' "$ACCOUNT" "$NAME" "$SECRET_NAME" "$TOKEN" <<< "$VALUE"
+' "$ACCOUNT" "$NAME" "$SECRET_NAME" "$TOKEN" < <(printf '%s' "$VALUE")
+# printf '%s' rather than a here-string: <<< appends a newline, and a webhook secret
+# with an invisible trailing byte fails every HMAC check with a silent 401. Learned live.
