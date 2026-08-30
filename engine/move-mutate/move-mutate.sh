@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # move-mutate — systematic mutation testing for any Sui Move package.
 #
@@ -45,7 +46,7 @@
 #
 # PARALLELISM, AND WHY IT NEEDS ITS OWN MOVE CACHE. `sui move test` takes a lock on
 # the shared Move package cache (MOVE_HOME, default ~/.move), so concurrent runs
-# serialise completely: measured on this estate, four concurrent runs against four
+# serialise completely: measured here, four concurrent runs against four
 # separate package copies took 32.0s versus 8.3s for one — exactly 4x, no gain at all.
 # Giving each worker its own MOVE_HOME (an APFS clone of the cache, so it costs
 # metadata rather than gigabytes) took the same four runs to 10.4s at 484% CPU. The

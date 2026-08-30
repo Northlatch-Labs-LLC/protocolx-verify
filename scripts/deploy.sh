@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # Deploys the worker straight through the Cloudflare API — no wrangler, no npm install.
 #

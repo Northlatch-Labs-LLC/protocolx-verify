@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 """
 evidence_bundle — the artifact an auditor asks for, emitted by every run.
 
@@ -53,9 +54,9 @@ import datetime
 SCHEMA = "protocolx-verify/evidence-manifest"
 SCHEMA_VERSION = 1
 
-# The five gates, in the exact order and spelling of engine/ci/gates.sh. The same
-# names are a contract in worker/src/lib.js (parseGatesOutput) — the two parsers
-# must agree, because a gate this file cannot see is a gate that silently vanishes
+# The five gates, in the exact order and spelling of engine/ci/gates.sh. These names
+# are a contract with every parser that reads the gate battery's output — they must
+# all agree, because a gate this file cannot see is a gate that silently vanishes
 # from the evidence while still showing a verdict in the pull request.
 GATES = ["build", "digest", "tests", "pin", "mutation-smoke"]
 
@@ -149,7 +150,7 @@ ABSENCE_CONVENTION = (
     "means the number was not measured, and the reason is recorded beside it."
 )
 
-# Words REPORT.md may not contain. The estate publishes numbers; a survivor is an
+# Words REPORT.md may not contain. This tool publishes numbers; a survivor is an
 # untested invariant, and the moment a report reaches for security language it has
 # made a claim the measurement does not support. The test suite asserts on this
 # list, which is why it lives here rather than in the test: one source of truth.

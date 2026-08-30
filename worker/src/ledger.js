@@ -1,4 +1,5 @@
-// Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+// Built-by: @projectx.sui /|\
+// Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // THE USAGE LEDGER — the measurement that makes an invoice possible.
 //

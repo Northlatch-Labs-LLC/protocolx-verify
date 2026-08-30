@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 """
 The instrument's own test suite.
 
 move-mutate exists to say that a passing suite is not evidence. A tool making
 that claim while being itself untested would be self-refuting, so these tests
-are a deliverable, not a courtesy. The test-internal fixtures are pinned to
-real line numbers in real client code: a refactor that silently re-admits
-test-internal asserts fails here rather than in a client engagement.
+are a deliverable, not a courtesy. The test-internal fixtures pin exact line
+numbers, so a refactor that silently re-admits test-internal asserts — or
+silently drops a production guard — fails here rather than in the field.
 
 Run:  python3 test/test_movemutate.py
 """
@@ -81,9 +82,9 @@ class TestFindAsserts(unittest.TestCase):
 
     def test_semicolonless_tail_assert_is_found(self):
         """The class the `);` predicate cannot see: an assert that is the last
-        expression of a function, so Move permits no trailing semicolon.
-        Measured once in real client code (Scallop borrow_referral.move:279,
-        an authorisation guard)."""
+        expression of a function, so Move permits no trailing semicolon. Seen in
+        the wild as an authorisation guard, and invisible to the naive
+        predicate every mutation tool starts with."""
         tail = [a for a in movelex.find_asserts(self.src)
                 if "tail_guard" in (movelex.enclosing_function(
                     movelex.find_functions(self.src), a["start"]) or {}).get("name", "")]
@@ -91,59 +92,86 @@ class TestFindAsserts(unittest.TestCase):
 
 
 class TestTestInternalExclusion(unittest.TestCase):
-    """Pinned regression fixtures from real client code.
+    """Pinned regression fixtures for the test-region lexer.
 
-    Every line below was a phantom survivor in a real run: an assertion inside
-    an inline `#[test]`/`#[test_only]` declaration, which no test can ever
-    fail, scored as a surviving mutant and inflating the survivor count in the
-    direction that flatters us.
+    Every phantom line below is an assertion inside an inline `#[test]` /
+    `#[test_only]` declaration, which no test run can ever fail. Scored as a
+    surviving mutant it inflates the survivor count in the direction that
+    flatters us. Every production line below is the mirror-image failure:
+    excluding one would silently shrink our own numbers.
+
+    The fixtures are authored, not captured — annotation-forms.move enumerates
+    the declaration shapes, production-guards.move the guards that must survive
+    them — so the intended answer is the file, and no third party's source is
+    redistributed to ask the question.
     """
     PHANTOMS = {
-        "scallop-obligation_access.move.snapshot": [107, 113, 136, 142],
-        "scallop-value_calculator.move.snapshot": [40],
-        "scallop-borrow_referral.move.snapshot": [371, 410, 413, 416, 418],
-        "scallop-version.move.snapshot": [57, 60, 61],
-        "scallop-interest_model.move.snapshot": [271, 276, 282, 287, 292, 297,
-                                                 302, 308, 313, 318, 323],
+        "annotation-forms.move": [43, 50, 58, 59, 65, 71, 78, 86, 93, 99],
+        "production-guards.move": [41],
     }
     # Production guards in the same files. Excluding one of these would be the
     # mirror-image failure: silently shrinking our own numbers.
     PRODUCTION = {
-        "scallop-obligation_access.move.snapshot": [41, 48, 55, 62, 69, 75],
-        "scallop-borrow_referral.move.snapshot": [112, 201, 216, 230, 279],
-        "scallop-version.move.snapshot": [40],
+        "annotation-forms.move": [29, 104],
+        "production-guards.move": [17, 21, 27, 32, 45, 50],
     }
+    # Authored intent: 11 phantoms across the two fixtures, and not one more.
+    # A lexer change that starts governing a declaration it should not moves
+    # this number up; one that stops governing a test body moves it down.
+    TOTAL_PHANTOMS = 11
+
+    def _excluded(self, fn):
+        text = fixture(fn)
+        regions = movelex.find_test_regions(text)
+        return {movelex.line_of(text, a["start"])
+                for a in movelex.find_asserts(text)
+                if movelex.in_regions(regions, a["start"])}
 
     def test_every_known_phantom_is_excluded(self):
         for fn, lines in self.PHANTOMS.items():
-            text = fixture(fn)
-            regions = movelex.find_test_regions(text)
-            excluded = {movelex.line_of(text, a["start"])
-                        for a in movelex.find_asserts(text)
-                        if movelex.in_regions(regions, a["start"])}
+            excluded = self._excluded(fn)
             for ln in lines:
                 self.assertIn(ln, excluded, "%s:%d must be excluded as test-internal" % (fn, ln))
 
-    def test_total_phantom_count_is_24(self):
-        """Two independently built classifiers agreed on 24 for this package."""
-        total = 0
-        for fn in self.PHANTOMS:
-            text = fixture(fn)
-            regions = movelex.find_test_regions(text)
-            total += sum(1 for a in movelex.find_asserts(text)
-                         if movelex.in_regions(regions, a["start"]))
-        self.assertEqual(total, 24)
+    def test_total_phantom_count_is_exact(self):
+        """Over-exclusion and under-exclusion are both wrong, so the count is
+        pinned rather than bounded."""
+        total = sum(len(self._excluded(fn)) for fn in self.PHANTOMS)
+        self.assertEqual(total, self.TOTAL_PHANTOMS)
 
     def test_no_production_guard_is_excluded(self):
         for fn, lines in self.PRODUCTION.items():
-            text = fixture(fn)
-            regions = movelex.find_test_regions(text)
-            excluded = {movelex.line_of(text, a["start"])
-                        for a in movelex.find_asserts(text)
-                        if movelex.in_regions(regions, a["start"])}
+            excluded = self._excluded(fn)
             for ln in lines:
                 self.assertNotIn(ln, excluded,
                                  "%s:%d is production code and must NOT be excluded" % (fn, ln))
+
+    def test_every_assert_is_accounted_for(self):
+        """No assert in either fixture may be unclassified: the two pinned sets
+        must together name every assert the lexer finds."""
+        for fn in self.PHANTOMS:
+            text = fixture(fn)
+            found = sorted(movelex.line_of(text, a["start"])
+                           for a in movelex.find_asserts(text))
+            named = sorted(self.PHANTOMS[fn] + self.PRODUCTION[fn])
+            self.assertEqual(found, named,
+                             "%s: the fixture and the pinned line sets have drifted" % fn)
+
+    def test_non_test_attribute_does_not_open_a_region(self):
+        """`#[allow(lint(...))]` carries nested parentheses. Reading it as a
+        test annotation would swallow the guard that follows it."""
+        self.assertNotIn(29, self._excluded("annotation-forms.move"))
+
+    def test_annotated_use_declaration_ends_at_its_semicolon(self):
+        """`#[test_only] use ...;` has no body. A region that brace-matched from
+        there would govern the next function instead."""
+        text = fixture("annotation-forms.move")
+        regions = movelex.find_test_regions(text)
+        use_line = [i + 1 for i, ln in enumerate(text.splitlines())
+                    if ln.strip() == "use sui::test_scenario;"][0]
+        offset = sum(len(ln) + 1 for ln in text.splitlines()[:use_line])
+        self.assertFalse(movelex.in_regions(regions, offset + 1),
+                         "the declaration after an annotated `use` must not be governed")
 
     def test_synthetic_annotation_forms(self):
         text = fixture("synthetic.move")

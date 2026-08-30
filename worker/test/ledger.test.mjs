@@ -1,4 +1,5 @@
-// Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+// Built-by: @projectx.sui /|\
+// Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // The usage ledger — the measurement that makes a $149/repository/month invoice possible.
 //

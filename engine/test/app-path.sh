@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
-# app-path — prove the ENGINE COPY, the one the GitHub App actually ships as
-# `PVS · mutation-smoke`, derives mutations from a nested package.
+# app-path — prove the SHIPPED ENGINE COPY, the one that produces the
+# `mutation-smoke` verdict, derives mutations from a nested package.
 #
 # WHY THIS EXISTS. The shipped engine once derived mutations with a FLAT
-# `sources/*.move` glob. Any client nesting modules in subdirectories — which is
-# every codebase large enough to afford us — derived ZERO mutations, and our own
-# product reported "nothing to mutate" and failed its own gate on their flagship
-# repository. The tool was fixed; the shipped copy was not, for two generations.
+# `sources/*.move` glob. Any package nesting modules in subdirectories derived ZERO
+# mutations, and the run reported "nothing to mutate" against real code — which reads
+# as an empty repository when it is a broken tool. The engine was fixed upstream; the
+# shipped copy was not, for two generations.
 #
-# This test runs the SHIPPED PATH, not the tool it was copied from. A fix that works
-# in verification-tools and not through the App is not a fix.
+# So this test runs the SHIPPED PATH, not the source it was copied from. A fix that
+# lands upstream and not here is not a fix.
 #
 # It needs python3 but NOT sui: `--list` derives and exits before the baseline.
 set -uo pipefail

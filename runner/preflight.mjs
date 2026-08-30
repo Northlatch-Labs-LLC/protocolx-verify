@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+// Built-by: @projectx.sui /|\
+// Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // preflight — the runner's front gate. Everything here happens BEFORE any client code
 // is executed, and nothing here executes client code: it reads two text files and makes

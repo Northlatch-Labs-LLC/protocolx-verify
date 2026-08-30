@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+// Built-by: @projectx.sui /|\
+// Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // resolve-package — the Action's front gate for the one value a stranger's repository
 // gets to choose. Nothing here executes client code: it reads at most one small JSON
@@ -9,15 +10,15 @@
 // configuration does the right thing on a Move repo:
 //
 //   1. The `package` input, when set — explicit wins.
-//   2. `.protocolx-verify.json` at the repository root — the same file, with the same
-//      meaning, as the GitHub App reads. One config serves both paths.
+//   2. `.protocolx-verify.json` at the repository root — a committed, reviewable
+//      answer, so the resolution does not depend on how the workflow was written.
 //   3. A `Move.toml` at the repository root — the commonest open-source layout.
 //   4. Exactly one `Move.toml` within three directory levels — the monorepo-with-one-
 //      package layout. Two or more is ambiguous and we say so rather than guessing;
 //      guessing wrong would verify the wrong contract and call it evidence.
 //
-// Every resolved value passes the same validatePackagePath allowlist the App runner
-// enforces, because the value ends up as an argument to bash either way.
+// Every resolved value passes the validatePackagePath allowlist, because the value
+// ends up as an argument to bash either way.
 
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -55,7 +56,7 @@ if (input !== '') {
   process.exit(0);
 }
 
-// 2. The App's own config file, honoured identically here.
+// 2. The committed config file.
 const configPath = join(workspace, '.protocolx-verify.json');
 if (existsSync(configPath)) {
   if (statSync(configPath).size > MAX_CONFIG_BYTES) {

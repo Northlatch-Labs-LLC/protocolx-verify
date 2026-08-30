@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 """
 workflow-audit — read .github/workflows/verify-run.yml and prove key distance from its
 own text.

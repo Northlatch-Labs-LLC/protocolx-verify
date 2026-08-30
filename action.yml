@@ -1,12 +1,12 @@
-# Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # ProtocolX Verify — the composite GitHub Action.
 #
-# The same engine as the GitHub App — engine/ci/gates.sh: build, digest guard, tests,
-# framework pin, mutation smoke — reaching the same customer through their own CI. The
-# App is the convenience path; this is the zero-trust path. It runs on the client's
-# runner, inside the client's job, and no token of theirs or ours changes hands: this
-# action receives no secrets, mints nothing, and phones nowhere.
+# engine/ci/gates.sh, run in the caller's own CI: build, digest guard, tests, framework
+# pin, mutation smoke. It runs on the client's runner, inside the client's job, and no
+# token of theirs or ours changes hands: this action receives no secrets, mints nothing,
+# and phones nowhere.
 #
 # WHAT CARRIES OVER FROM THE RUNNER, UNCHANGED IN MEANING:
 #
@@ -22,10 +22,12 @@
 #     invoked us.
 #
 #   · THE TRIPWIRE. Every file this action ships is hashed before the client's code
-#     exists on the machine and re-hashed after it has run. If a file under runner/,
-#     worker/, engine/ or action/ changed while client code was running, no verdict is
-#     posted — the run fails loudly instead of reporting from a tree a stranger just
-#     edited.
+#     exists on the machine and re-hashed after it has run. If any of it changed while
+#     client code was running, no verdict is posted — the run fails loudly instead of
+#     reporting from a tree a stranger just edited. Both readings go through
+#     runner/tripwire.sh, which hashes the shipped directories that are present and
+#     refuses outright if none are: a tripwire that errors on a missing directory is
+#     an absent tripwire, and nothing later would notice.
 #
 #   · THE ENGINE SELF-TEST RUNS FIRST. Before touching client code, the shipped
 #     mutation engine must derive mutations from its own nested-package fixture. We do
@@ -105,9 +107,10 @@ runs:
   steps:
     - name: Fingerprint the shipped tooling
       # Before a single client byte is staged: hash every file we ship, so "the sandbox
-      # held" is something the run checks rather than assumes. __pycache__ is excluded —
-      # our own engine self-test writes .pyc files between the two hashes, and a
-      # tripwire that cries wolf gets disabled.
+      # held" is something the run checks rather than assumes. Both readings go through
+      # runner/tripwire.sh so they cannot drift apart, and so a tree that ships without
+      # one of those directories still arms instead of erroring — see the header of that
+      # script, and runner/test/tripwire.test.sh, which proves it still trips.
       shell: bash
       run: |
         set -euo pipefail
@@ -119,10 +122,8 @@ runs:
         rm -rf "$WORK"
         mkdir -p "$WORK"
         echo "PVS_WORK=$WORK" >> "$GITHUB_ENV"
-        cd "$GITHUB_ACTION_PATH"
-        find runner worker engine action -type f -not -path '*/__pycache__/*' -print0 \
-          | sort -z | xargs -0 sha256sum > "$WORK/tooling-before.sha256"
-        echo "tooling fingerprinted: $(wc -l < "$WORK/tooling-before.sha256") files"
+        bash "$GITHUB_ACTION_PATH/runner/tripwire.sh" arm \
+          "$GITHUB_ACTION_PATH" "$WORK/tooling-before.sha256"
 
     - name: Resolve the Move package
       id: cfg
@@ -284,18 +285,14 @@ runs:
         # Runs BEFORE anything reads verdicts from this tree. If the client's code
         # reached our tooling or our engine, the correct outcome is a loud failed run —
         # not a verdict computed by a script a stranger just edited.
+        bash "$GITHUB_ACTION_PATH/runner/tripwire.sh" verify "$GITHUB_ACTION_PATH" \
+          "$PVS_WORK/tooling-before.sha256" "$PVS_WORK/tooling-after.sha256"
         cd "$GITHUB_ACTION_PATH"
-        find runner worker engine action -type f -not -path '*/__pycache__/*' -print0 \
-          | sort -z | xargs -0 sha256sum > "$PVS_WORK/tooling-after.sha256"
-        if ! diff -u "$PVS_WORK/tooling-before.sha256" "$PVS_WORK/tooling-after.sha256"; then
-          echo "::error title=PVS sandbox breach::A file under runner/, worker/, engine/ or action/ changed while the client's code was running. No verdict will be posted from this tree."
-          exit 1
-        fi
         if ! sha256sum -c engine/CHECKSUMS; then
           echo "::error title=PVS sandbox breach::The engine no longer matches its recorded hashes after the client's run. No verdict will be posted."
           exit 1
         fi
-        echo "tooling and engine unchanged across the client's run"
+        echo "engine unchanged across the client's run"
 
     - name: Build the evidence bundle
       shell: bash
