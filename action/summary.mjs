@@ -18,7 +18,7 @@
 // correct — in that case we genuinely have no evidence anything ran.
 
 import { readFileSync, appendFileSync, existsSync } from 'node:fs';
-import { parseGatesOutput, GATES } from '../worker/src/lib.js';
+import { parseGatesOutput, GATES } from './gates-output.mjs';
 
 const [gatesLogPath, manifestPath] = process.argv.slice(2);
 

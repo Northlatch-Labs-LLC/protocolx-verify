@@ -73,6 +73,16 @@ jobs:
       - name: Mutation engine unit tests
         run: python3 engine/move-mutate/test/test_movemutate.py
 
+      - name: The action's closure does not reach into the worker
+        # The defect this guards cost a full hosted-runner e2e to find:
+        # action/summary.mjs imported the gate parser from worker/src/lib.js, so in a
+        # tree that ships without the worker the LAST step of every run died with
+        # ERR_MODULE_NOT_FOUND — after installing the toolchain, sandboxing the
+        # client's code and measuring all five gates. The parser now exists twice;
+        # this proves the copies agree and that no runtime file reaches outside the
+        # shipped closure again.
+        run: node --test runner/test/gates-output-mirror.test.mjs
+
       - name: The tamper tripwire trips in a tree with no worker/
         # A security control, not a path check. The tripwire used to be three copies of
         # `find runner worker engine action` inside action.yml, and `find` EXITS
@@ -133,6 +143,8 @@ jobs:
           node --check runner/test/preflight.test.mjs
           node --check action/resolve-package.mjs
           node --check action/summary.mjs
+          node --check action/gates-output.mjs
+          node --check runner/test/gates-output-mirror.test.mjs
 
       - name: Every module the worker imports is actually deployed
         # scripts/deploy.sh uploads an explicit module list to the Cloudflare API. A new
