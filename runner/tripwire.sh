@@ -32,8 +32,9 @@
 # readings differ. Nothing downstream should run after that.
 set -euo pipefail
 
-# Every directory whose contents are ours to ship. A tree that omits one — the
-# published action carries no Cloudflare worker — must still arm.
+# Every directory whose contents are ours to ship. Not every tree carries all four —
+# the published action ships without `worker/` — and a tree that omits one must still
+# arm rather than error.
 TRIPWIRE_DIRS="runner worker engine action"
 
 # `xargs` cannot call a shell function, so the hashing tool is resolved by name.

@@ -173,17 +173,39 @@ A Linux runner with passwordless sudo — GitHub's hosted `ubuntu-latest` has bo
 sandbox's privilege drop is mandatory (`PVS_SANDBOX_REQUIRED=1`); a runner that cannot
 provide it gets a refusal, not a degraded run.
 
-## Terms
-
-Free forever on one public repository per organisation. $149 per repository per month
-beyond that (annual $1,490). The action does not meter, phone home, or enforce anything:
-the terms are stated here and in the run summary, and honoured on the honour system.
-
-Contact: kaela@projectxprotocol.dev
-
 ## Licence
 
-See [`LICENSE`](LICENSE) at the repository root.
+**Business Source License 1.1.** Full text: [`LICENSE`](LICENSE). The parameters, in
+plain words:
+
+- **You may run this action in your own CI, against code your organisation owns or is
+  entitled to modify, in production, at no charge and with no agreement to sign.** That
+  is the Additional Use Grant, and it is the case almost everybody reading this is in.
+- **You may read, audit, copy and modify every line.** That is not a concession, it is
+  the point. A sandbox you cannot inspect is a claim, not a control — so go and read
+  `runner/sandbox.sh` and `runner/tripwire.sh` before you trust either.
+- **You may not offer it to other people as a hosted or resold verification service**,
+  and you may not run it against someone else's code as part of a paid engagement,
+  without a commercial licence from us. Ask; that conversation is a normal one.
+- **On 2030-08-30 the whole thing converts to Apache-2.0** automatically, under the
+  licence's own terms.
+
+BUSL is source-available, not OSI open source. If your organisation's policy blocks
+non-OSI licences in CI, tell us — that is exactly what alternative licensing is for.
+
+Licensor: Northlatch Labs LLC. Licensing enquiries: kaela@projectxprotocol.dev
+
+## If you would rather we ran it
+
+Nothing below is required to use this action. It exists because some teams want the
+measurement without owning the pipeline.
+
+| | |
+|---|---|
+| **First Report** — one Move package, all five gates, evidence bundle with a reproducible digest, delivered in 24 hours | **$1,000**, once |
+| **The App** — the same gates on every pull request, run and hosted by us | **$149 / repository / month** (annual $1,490) |
+
+Contact: kaela@projectxprotocol.dev
 
 ---
 

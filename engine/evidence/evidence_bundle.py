@@ -54,9 +54,9 @@ import datetime
 SCHEMA = "protocolx-verify/evidence-manifest"
 SCHEMA_VERSION = 1
 
-# The five gates, in the exact order and spelling of engine/ci/gates.sh. The same
-# names are a contract in worker/src/lib.js (parseGatesOutput) — the two parsers
-# must agree, because a gate this file cannot see is a gate that silently vanishes
+# The five gates, in the exact order and spelling of engine/ci/gates.sh. These names
+# are a contract with every parser that reads the gate battery's output — they must
+# all agree, because a gate this file cannot see is a gate that silently vanishes
 # from the evidence while still showing a verdict in the pull request.
 GATES = ["build", "digest", "tests", "pin", "mutation-smoke"]
 

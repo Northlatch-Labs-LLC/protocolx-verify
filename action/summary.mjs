@@ -99,21 +99,11 @@ if (manifest?.bundleDigest) {
 }
 L.push('');
 
-// The free tier, expressed and not enforced: this action runs entirely in your CI and
-// phones nowhere, so there is nothing here to meter. The terms travel with the output
-// instead, where the person who adopted the action actually reads.
-let repoIsPrivate = false;
-try {
-  const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
-  repoIsPrivate = event?.repository?.private === true;
-} catch {
-  repoIsPrivate = false;
-}
-if (repoIsPrivate) {
-  L.push('> **Licensing** — ProtocolX Verify is free forever on one public repository per organisation. This repository is private: continued use needs a subscription ($149/repository/month, annual $1,490). Nothing is enforced from inside your CI and nothing is transmitted; this notice is the honour system, stated plainly. Contact: kaela@projectxprotocol.dev.');
-} else {
-  L.push('> **Licensing** — free forever on one public repository per organisation; $149/repository/month beyond that. This run transmitted nothing.');
-}
+// The licence, stated where the person who adopted the action actually reads. This runs
+// entirely inside the client's CI and phones nowhere, so there is nothing here to meter
+// and nothing here to enforce; the terms travel with the output instead. Keep it to one
+// line. A client's build log is not a place to sell to them.
+L.push('> **Licence** — Business Source License 1.1, in full at `LICENSE` in the action\'s repository. Running ProtocolX Verify in your own CI against code you own is granted at no charge, including in production, and you are meant to read the source: the sandbox is only credible if you can check it. Offering it to others as a hosted or resold verification service needs a commercial licence. On 2030-08-30 it converts to Apache-2.0. This run metered nothing and transmitted nothing. Contact: kaela@projectxprotocol.dev.');
 L.push('');
 
 if (process.env.GITHUB_STEP_SUMMARY) {

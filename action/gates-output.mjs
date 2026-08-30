@@ -4,21 +4,20 @@
 // gates-output — read the gate battery's own stdout back into per-gate verdicts.
 //
 // WHY THIS FILE EXISTS AS A SEPARATE FILE. action/summary.mjs used to import this
-// logic from worker/src/lib.js. The worker is our own service and does not ship with
-// the composite action, so in a tree without it the last step of every run died with
-// ERR_MODULE_NOT_FOUND: no verdicts, no summary, no outputs — the run failed for a
+// logic from a module outside the action's own directories. That module does not ship
+// with the composite action, so in a tree without it the last step of every run died
+// with ERR_MODULE_NOT_FOUND: no verdicts, no summary, no outputs — the run failed for a
 // reason that had nothing to do with the client's code, after doing all the work.
-// Measured on a hosted runner against a worker-less tree, which is the only way that
-// class of defect is ever found.
+// Measured on a hosted runner against a tree that omitted it, which is the only way
+// that class of defect is ever found.
 //
 // So the action's runtime closure now reaches only into action/, runner/ and engine/,
-// and this file is the copy it reaches. worker/src/lib.js keeps its own, because the
-// worker is deployed as an explicit module list and must not import across the tree.
+// and this file is the copy it reaches.
 //
 // THE COST, STATED. Two implementations of one parser can drift, and a drifted parser
-// reports a gate verdict that the other half of the estate would have read
-// differently. runner/test/gates-output-mirror.test.mjs runs both against the same
-// inputs — including a real captured gates.log — and fails if they ever disagree.
+// reports a gate verdict differently from the one that reads the same lines elsewhere.
+// A mirror test runs both against the same inputs — including a real captured
+// gates.log — and fails if they ever disagree.
 //
 // The formats matched here are the engine's own echo lines, verbatim:
 //   "── gate: build"       then "   build: PASS" | "   build: FAIL"

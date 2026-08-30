@@ -104,10 +104,21 @@ cannot provide it gets a refusal, not a degraded run.
 
 ### Pricing
 
-Free forever on one public repository per organisation. $149/repository/month beyond
-that (annual $1,490) — the action does not meter, phone home, or enforce; the terms
-are stated here and in the run summary, and honoured on the honour system. Contact:
-kaela@projectxprotocol.dev.
+**Corrected 2026-08-30 by the licence ruling ("Move to BUSL"). The old wording — "free
+forever on one public repository per organisation, $149/repository/month beyond that" —
+applied that price to the Action, and BUSL-1.1's Additional Use Grant contradicts it: a
+client may run the Action in their own CI against their own code, public or private,
+in production, at no charge. Do not quote the per-repository price for the Action.**
+
+- **The Action** — free under BUSL-1.1 for the client's own code in the client's own CI.
+  Not metered, not enforced, nothing transmitted. Reselling it or hosting it for others
+  needs a commercial licence.
+- **The App** (this document's subject) — **$149/repository/month, annual $1,490.** This
+  is a service the estate runs; the licence grant does not cover it because the client
+  is not the one running it.
+- **The First Report** — **$1,000**, one package, once. Ruled 2026-08-30.
+
+Contact: kaela@projectxprotocol.dev.
 
 ### App or Action?
 
