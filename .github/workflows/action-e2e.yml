@@ -1,0 +1,81 @@
+# Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+#
+# action-e2e — run the composite action for real, on this repository's own nested
+# Move fixture, and assert the OUTCOME rather than hoping for green.
+#
+# The fixture has four production guards and no test that exercises any of them, so
+# the honest result is: build passes, tests pass (zero tests is a passing suite),
+# digest and pin skip (the fixture deploys nothing and pins nothing), and the
+# mutation-smoke gate FAILS with survivors. That failure is the product working —
+# a demo that only proved the happy path would prove nothing about the one gate
+# that differentiates us. The gates are not tuned to make this pass; the assertion
+# is tuned to expect what an untested package deserves.
+#
+# What this run proves end to end on a hosted runner: package auto-resolution (a
+# root Move.toml, the "." path), the uid privilege drop under PVS_SANDBOX_REQUIRED=1,
+# the tamper tripwire across a real client run, the evidence bundle and its digest,
+# the step summary, and the action's outputs.
+
+name: Action e2e
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Composite action against the nested fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: pvs
+          # The job's token must not exist inside the tree the action will stage into
+          # its sandbox. The action also excludes .git on its own; this is the belt to
+          # that brace.
+          persist-credentials: false
+
+      - name: Stage the fixture as the workspace's own Move package
+        run: |
+          set -euo pipefail
+          cp -R pvs/engine/test/nested-fixture/. .
+          ls Move.toml sources
+
+      - name: Run the composite action
+        id: verify
+        continue-on-error: true
+        uses: ./pvs
+
+      - name: Assert the honest outcome
+        env:
+          OUTCOME: ${{ steps.verify.outcome }}
+          VERDICTS: ${{ steps.verify.outputs.verdicts }}
+          SURVIVED: ${{ steps.verify.outputs.survived }}
+          DIGEST: ${{ steps.verify.outputs.bundle-digest }}
+        run: |
+          set -euo pipefail
+          echo "outcome:  $OUTCOME"
+          echo "verdicts: $VERDICTS"
+          echo "survived: $SURVIVED"
+          echo "digest:   $DIGEST"
+          fail() { echo "::error title=action-e2e::$1"; exit 1; }
+          [ "$OUTCOME" = "failure" ] || fail "expected the action to fail on an untested package (mutation survivors), got outcome=$OUTCOME"
+          node -e '
+            const v = JSON.parse(process.env.VERDICTS || "{}");
+            const expect = { build: "pass", digest: "skipped", tests: "pass", pin: "skipped", "mutation-smoke": "fail" };
+            for (const [gate, want] of Object.entries(expect)) {
+              if (v[gate] !== want) { console.error(`gate ${gate}: expected ${want}, got ${v[gate]}`); process.exit(1); }
+            }
+            console.log("all five verdicts are exactly as an untested package deserves");
+          '
+          [ -n "$SURVIVED" ] && [ "$SURVIVED" -ge 1 ] || fail "expected at least one surviving mutation on the untested fixture, got '$SURVIVED'"
+          [ -n "$DIGEST" ] || fail "expected an evidence bundle digest; the bundle should have been written"
+          echo "e2e: the action measured an untested package and said so, with evidence"

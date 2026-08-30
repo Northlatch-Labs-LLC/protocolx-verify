@@ -1,0 +1,345 @@
+# Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+#
+# ProtocolX Verify — the composite GitHub Action.
+#
+# The same engine as the GitHub App — engine/ci/gates.sh: build, digest guard, tests,
+# framework pin, mutation smoke — reaching the same customer through their own CI. The
+# App is the convenience path; this is the zero-trust path. It runs on the client's
+# runner, inside the client's job, and no token of theirs or ours changes hands: this
+# action receives no secrets, mints nothing, and phones nowhere.
+#
+# WHAT CARRIES OVER FROM THE RUNNER, UNCHANGED IN MEANING:
+#
+#   · THE SANDBOX HOLDS OR NOTHING RUNS. Client code — `sui move build` fetching and
+#     compiling their declared dependencies, `sui move test` executing their bytecode,
+#     their own scripts/check-framework-pin.sh, which is arbitrary shell — runs through
+#     runner/sandbox.sh: an `env -i` allowlist under a dedicated unprivileged uid, in a
+#     staged tree that holds nothing of ours and nothing of the caller's job
+#     environment. PVS_SANDBOX_REQUIRED=1: if the drop cannot be made, the run fails;
+#     it does not fall back to executing the code with the job's environment in reach.
+#     The caller's own secrets are what the allowlist protects here — a test that reads
+#     the environment finds PATH and HOME, not the deploy key of the workflow that
+#     invoked us.
+#
+#   · THE TRIPWIRE. Every file this action ships is hashed before the client's code
+#     exists on the machine and re-hashed after it has run. If a file under runner/,
+#     worker/, engine/ or action/ changed while client code was running, no verdict is
+#     posted — the run fails loudly instead of reporting from a tree a stranger just
+#     edited.
+#
+#   · THE ENGINE SELF-TEST RUNS FIRST. Before touching client code, the shipped
+#     mutation engine must derive mutations from its own nested-package fixture. We do
+#     not report a mutation verdict from an engine that cannot measure its own
+#     self-test, and the error for that names the fault as ours, not theirs.
+#
+#   · MEASUREMENT OUTLIVES REPORTING. The gate battery's exit code is read from its
+#     output, per gate, by the final verdict step. A gate that never reported is swept
+#     to an explicit failure — "never ran" must not read as "passed" — and a gate that
+#     ran keeps its real verdict whatever else failed.
+#
+#   · THE EVIDENCE BUNDLE DEGRADES GRACEFULLY. If the bundle cannot be written the
+#     gate verdicts still stand; they simply carry no digest, and the summary says so.
+#
+# WHAT THIS ACTION DOES NOT DO, said plainly: it does not filter outbound network
+# traffic from the sandbox, it does not certify a contract is secure, and it does not
+# collect or transmit anything — there is no telemetry. Five gates are measured
+# evidence, not an audit.
+#
+# Runner requirements: a Linux runner with passwordless sudo. GitHub's hosted
+# `ubuntu-latest` satisfies both.
+
+name: ProtocolX Verify
+description: >-
+  Five verification gates for Sui Move packages — build, deployed-digest guard, tests,
+  framework pin, mutation smoke — run sandboxed in your own CI, with a
+  content-addressed evidence bundle. Measured evidence, not an audit.
+author: Northlatch Labs LLC
+
+branding:
+  icon: shield
+  color: gray-dark
+
+inputs:
+  package:
+    description: >-
+      Path of the Move package to verify, relative to the repository root. Leave unset
+      to auto-detect: .protocolx-verify.json first, then a Move.toml at the repository
+      root, then a single Move.toml one to three directories deep.
+    required: false
+    default: ''
+  mutation-limit:
+    description: >-
+      How many mutations the mutation-smoke gate executes (each one costs a full test
+      suite run). The evidence bundle records both this limit and the package's full
+      derivable count, so the limit never masquerades as coverage.
+    required: false
+    default: '5'
+  sui-version:
+    description: >-
+      Pinned Sui CLI release tag. A floating toolchain changes what compiles — and what
+      digest source builds to — without a line of your repository changing.
+    required: false
+    default: mainnet-v1.77.2
+  python-version:
+    description: Pinned Python for the mutation engine's derivation and reporting stages.
+    required: false
+    default: '3.11'
+  upload-evidence:
+    description: Upload the evidence bundle (manifest.json, REPORT.md) as a workflow artifact.
+    required: false
+    default: 'true'
+
+outputs:
+  verdicts:
+    description: 'JSON map of gate name to verdict: pass, fail, skipped, or never-reported.'
+    value: ${{ steps.verdict.outputs.verdicts }}
+  bundle-digest:
+    description: The evidence bundle's reproducible digest, or empty if the bundle could not be written.
+    value: ${{ steps.verdict.outputs.bundle_digest }}
+  survived:
+    description: Mutations that survived the test suite in this run's smoke sample, or empty if unmeasured.
+    value: ${{ steps.verdict.outputs.survived }}
+
+runs:
+  using: composite
+  steps:
+    - name: Fingerprint the shipped tooling
+      # Before a single client byte is staged: hash every file we ship, so "the sandbox
+      # held" is something the run checks rather than assumes. __pycache__ is excluded —
+      # our own engine self-test writes .pyc files between the two hashes, and a
+      # tripwire that cries wolf gets disabled.
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "$(uname -s)" != "Linux" ]; then
+          echo "::error title=ProtocolX Verify::This action needs a Linux runner with passwordless sudo (ubuntu-latest works). Got: $(uname -s)."
+          exit 1
+        fi
+        WORK="$RUNNER_TEMP/pvs-work"
+        rm -rf "$WORK"
+        mkdir -p "$WORK"
+        echo "PVS_WORK=$WORK" >> "$GITHUB_ENV"
+        cd "$GITHUB_ACTION_PATH"
+        find runner worker engine action -type f -not -path '*/__pycache__/*' -print0 \
+          | sort -z | xargs -0 sha256sum > "$WORK/tooling-before.sha256"
+        echo "tooling fingerprinted: $(wc -l < "$WORK/tooling-before.sha256") files"
+
+    - name: Resolve the Move package
+      id: cfg
+      shell: bash
+      env:
+        INPUT_PACKAGE: ${{ inputs.package }}
+      run: node "$GITHUB_ACTION_PATH/action/resolve-package.mjs" "$GITHUB_WORKSPACE"
+
+    - name: Apply the dependency policy
+      id: deps
+      shell: bash
+      env:
+        PKG: ${{ steps.cfg.outputs.package }}
+      run: |
+        node "$GITHUB_ACTION_PATH/runner/preflight.mjs" deps \
+          "$GITHUB_WORKSPACE" "$PKG" "$PVS_WORK/dependency-notes.md"
+
+    - name: Refuse the package and say why
+      if: steps.deps.outputs.refused == '1'
+      shell: bash
+      run: |
+        {
+          echo '## ProtocolX Verify — refused before anything ran'
+          echo
+          cat "$PVS_WORK/dependency-notes.md"
+        } >> "$GITHUB_STEP_SUMMARY"
+        echo "::error title=ProtocolX Verify::A declared dependency violates the policy. Nothing was fetched, built or run — the step summary says which and why."
+        exit 1
+
+    - name: Install Sui CLI (pinned)
+      shell: bash
+      env:
+        SUI_VERSION: ${{ inputs.sui-version }}
+      run: |
+        set -euo pipefail
+        curl -sSL -o "$RUNNER_TEMP/sui.tgz" \
+          "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz"
+        mkdir -p "$RUNNER_TEMP/sui"
+        tar -xzf "$RUNNER_TEMP/sui.tgz" -C "$RUNNER_TEMP/sui"
+        BIN="$(find "$RUNNER_TEMP/sui" -type f -name sui | head -1)"
+        [ -n "$BIN" ] || { echo "::error title=ProtocolX Verify::the pinned Sui archive contained no sui binary"; exit 1; }
+        # System-wide rather than into the runner's home: the sandbox uid must be able
+        # to execute it without being able to read that home directory.
+        sudo install -m 0755 "$BIN" /usr/local/bin/sui
+        sui --version
+
+    - name: Install Python (pinned — the mutation engine's derivation stage)
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Verify the mutation engine before touching client code
+      shell: bash
+      run: |
+        cd "$GITHUB_ACTION_PATH"
+        if ! command -v python3 >/dev/null 2>&1; then
+          echo "::error title=PVS engine unavailable::python3 is required by the ProtocolX Verify mutation engine and is not on PATH. The mutation-smoke gate cannot run. This is a fault in our action, not in your repository."
+          exit 1
+        fi
+        echo "python3: $(python3 --version)"
+        # Prove the shipped engine derives mutations from a NESTED package before we ask
+        # it to measure this repository's. A silently non-deriving engine would report
+        # "nothing to mutate" against real code, which reads as a broken client repo
+        # when it is a broken product.
+        if ! bash engine/test/app-path.sh; then
+          echo "::error title=PVS engine self-test failed::The shipped mutation engine failed its own nested-package self-test. Refusing to report a mutation verdict on your repository from an engine that cannot measure one. This is a fault in our action, not in your repository."
+          exit 1
+        fi
+
+    - name: Build the sandbox the client's code will run in
+      shell: bash
+      env:
+        PVS_SANDBOX_USER: pvs-sandbox
+        PVS_SANDBOX_ROOT: /srv/pvs
+      run: |
+        set -euo pipefail
+        if ! id -u "$PVS_SANDBOX_USER" >/dev/null 2>&1; then
+          sudo useradd --system --user-group --no-create-home --shell /usr/sbin/nologin "$PVS_SANDBOX_USER"
+        fi
+        sudo rm -rf "$PVS_SANDBOX_ROOT"
+        sudo mkdir -p "$PVS_SANDBOX_ROOT"
+        # The sandbox tree holds exactly two things: our engine, and this repository's
+        # files. No credential, no tooling that carries one, nothing of the caller's
+        # workspace configuration. .git is excluded deliberately: actions/checkout
+        # persists the job's token into .git/config by default, and the staged tree
+        # must not carry it.
+        sudo cp -R "$GITHUB_ACTION_PATH/engine" "$PVS_SANDBOX_ROOT/engine"
+        sudo mkdir -p "$PVS_SANDBOX_ROOT/client"
+        tar -C "$GITHUB_WORKSPACE" --exclude=.git -cf - . | sudo tar -C "$PVS_SANDBOX_ROOT/client" -xf -
+        sudo mkdir -p "$PVS_SANDBOX_ROOT/home" "$PVS_SANDBOX_ROOT/tmp"
+        sudo chown -R "$PVS_SANDBOX_USER:$PVS_SANDBOX_USER" "$PVS_SANDBOX_ROOT"
+        sudo chmod 0700 "$PVS_SANDBOX_ROOT"
+        # Close the door the other way too: the runner's home holds the workspace, the
+        # Actions temp directory and the toolchain caches. The sandbox uid has no
+        # business reading any of it.
+        sudo chmod o-rwx "$HOME" || true
+        echo "sandbox: $(id "$PVS_SANDBOX_USER")"
+        sudo ls -ld "$PVS_SANDBOX_ROOT"
+
+    - name: Derive the full mutation set for the evidence bundle
+      shell: bash
+      env:
+        PVS_SANDBOX_USER: pvs-sandbox
+        PVS_SANDBOX_REQUIRED: '1'
+        PKG: ${{ steps.cfg.outputs.package }}
+      run: |
+        # `--list` derives and exits before the baseline, so this needs python3 but not
+        # sui and costs seconds. It answers a question the smoke gate cannot: the gate
+        # runs with a limit and therefore reports how many mutations it RAN, not how
+        # many the package contains. The bundle carries both — and if this step
+        # produces nothing, the bundle says the total is unknown rather than guessing.
+        bash "$GITHUB_ACTION_PATH/runner/sandbox.sh" /srv/pvs \
+          bash engine/move-mutate/move-mutate.sh "client/$PKG" --list \
+          > "$PVS_WORK/derive.log" 2>&1 || true
+
+    - name: Run the gates
+      shell: bash
+      env:
+        PVS_SANDBOX_USER: pvs-sandbox
+        PVS_SANDBOX_REQUIRED: '1'
+        PKG: ${{ steps.cfg.outputs.package }}
+        MUTATION_LIMIT: ${{ inputs.mutation-limit }}
+      run: |
+        # THE MEASUREMENT. Sandboxed — nothing of the caller's environment is reachable
+        # from this step. The engine's exit code is deliberately not this step's:
+        # verdicts are read from its output, per gate, and the final step turns any
+        # silence into an explicit failure.
+        #
+        # $PKG was validated against a path allowlist before it got here and is passed
+        # as an argv element, never spliced into a command line.
+        bash "$GITHUB_ACTION_PATH/runner/sandbox.sh" /srv/pvs \
+          bash engine/ci/gates.sh "client/$PKG" --mutation-limit "$MUTATION_LIMIT" \
+          2>&1 | tee "$PVS_WORK/gates.log" || true
+
+    - name: Extract the measurement from the sandbox
+      shell: bash
+      env:
+        PKG: ${{ steps.cfg.outputs.package }}
+      run: |
+        # The mutation report is written inside /srv/pvs by a uid the workspace does
+        # not share. Copy out that ONE file — never the tree — so the bundle writer
+        # never runs inside the sandbox and the sandbox never gets a way to write
+        # into the workspace.
+        SRC="/srv/pvs/client/$PKG/mutation-report.json"
+        DEST="$PVS_WORK/mutation-report.json"
+        if sudo test -L "$SRC"; then
+          echo "::warning title=PVS evidence bundle::The mutation report in the sandbox is a symlink. Refusing to follow it out; the bundle will record the counts as unmeasured."
+        elif sudo test -f "$SRC"; then
+          sudo cp "$SRC" "$DEST"
+          sudo chown "$(id -u):$(id -g)" "$DEST"
+          echo "mutation report extracted: $(wc -c < "$DEST") bytes"
+        else
+          echo "no mutation report in the sandbox — the bundle will record the counts as unmeasured, not as zero"
+        fi
+
+    - name: Prove the sandbox held
+      shell: bash
+      run: |
+        # Runs BEFORE anything reads verdicts from this tree. If the client's code
+        # reached our tooling or our engine, the correct outcome is a loud failed run —
+        # not a verdict computed by a script a stranger just edited.
+        cd "$GITHUB_ACTION_PATH"
+        find runner worker engine action -type f -not -path '*/__pycache__/*' -print0 \
+          | sort -z | xargs -0 sha256sum > "$PVS_WORK/tooling-after.sha256"
+        if ! diff -u "$PVS_WORK/tooling-before.sha256" "$PVS_WORK/tooling-after.sha256"; then
+          echo "::error title=PVS sandbox breach::A file under runner/, worker/, engine/ or action/ changed while the client's code was running. No verdict will be posted from this tree."
+          exit 1
+        fi
+        if ! sha256sum -c engine/CHECKSUMS; then
+          echo "::error title=PVS sandbox breach::The engine no longer matches its recorded hashes after the client's run. No verdict will be posted."
+          exit 1
+        fi
+        echo "tooling and engine unchanged across the client's run"
+
+    - name: Build the evidence bundle
+      shell: bash
+      env:
+        PKG: ${{ steps.cfg.outputs.package }}
+        MUTATION_LIMIT: ${{ inputs.mutation-limit }}
+      run: |
+        # `|| echo` on purpose: this step records the measurement, and a recorder that
+        # can veto the thing it records is a recorder nobody should trust. If it dies,
+        # the verdicts still go out — without a digest, and saying so.
+        cd "$GITHUB_ACTION_PATH"
+        python3 engine/evidence/evidence_bundle.py \
+          --out "$PVS_WORK/evidence" \
+          --repository "$GITHUB_REPOSITORY" \
+          --commit "$GITHUB_SHA" \
+          --package-path "$PKG" \
+          --gates-log "$PVS_WORK/gates.log" \
+          --mutation-report "$PVS_WORK/mutation-report.json" \
+          --derive-log "$PVS_WORK/derive.log" \
+          --mutation-limit "$MUTATION_LIMIT" \
+          || echo "::warning title=PVS evidence bundle::The evidence bundle could not be written. The gate verdicts below are unaffected; they simply carry no digest."
+
+    - name: Tear the sandbox down
+      shell: bash
+      run: sudo rm -rf /srv/pvs || true
+
+    - name: Upload the evidence bundle
+      if: inputs.upload-evidence == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: protocolx-verify-evidence-${{ github.sha }}
+        path: ${{ env.PVS_WORK }}/evidence/
+        if-no-files-found: warn
+        retention-days: 90
+
+    - name: Report the verdict
+      id: verdict
+      shell: bash
+      env:
+        PKG: ${{ steps.cfg.outputs.package }}
+      run: |
+        # LAST, and the only step whose exit code carries the verdict: it reads the
+        # gate battery's own output, writes the step summary, publishes the outputs,
+        # and fails the job if any gate failed — or never reported, because "never
+        # ran" must not read as "passed".
+        node "$GITHUB_ACTION_PATH/action/summary.mjs" \
+          "$PVS_WORK/gates.log" "$PVS_WORK/evidence/manifest.json"

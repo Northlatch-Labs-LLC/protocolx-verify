@@ -44,6 +44,10 @@ export function validateSha(value) {
 // plain relative path inside the checkout — nothing else is a package directory.
 export function validatePackagePath(value) {
   if (typeof value !== 'string' || value.length === 0) return { ok: false, reason: 'config has no "package" string' };
+  // Exactly "." — the package IS the repository root, the commonest open-source Move
+  // layout. Allowed as a whole value only: "." as a path SEGMENT stays rejected below,
+  // because "a/./b" is a path trying to be clever and a root package is not.
+  if (value === '.') return { ok: true, value: '.' };
   if (value.length > 200) return { ok: false, reason: 'package path is implausibly long' };
   if (value.startsWith('/')) return { ok: false, reason: 'package path must be relative to the repository root' };
   if (!/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(value)) {

@@ -1,0 +1,34 @@
+# ProtocolX Verify — copy this file to .github/workflows/protocolx-verify.yml
+#
+# Five verification gates for your Sui Move package — build, deployed-digest guard,
+# tests, framework pin, mutation smoke — run sandboxed in your own CI. No GitHub App,
+# no token leaves your organisation, nothing is transmitted anywhere.
+#
+# Zero configuration on most repositories: the action finds your package by looking
+# for .protocolx-verify.json, then a root Move.toml, then a single nested Move.toml.
+# Monorepos with several packages set `package:` explicitly (one job per package).
+
+name: ProtocolX Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Five gates
+    runs-on: ubuntu-latest   # Linux with passwordless sudo is required — hosted runners have both
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Northlatch-Labs-LLC/protocolx-verify@v1
+        # All inputs are optional. The defaults are the product.
+        # with:
+        #   package: sui-contracts        # path to the Move package, when auto-detection is ambiguous
+        #   mutation-limit: '5'           # mutations executed per run; each one costs a test-suite run
+        #   sui-version: mainnet-v1.77.2  # pinned on purpose — a floating toolchain changes what compiles
+        #   upload-evidence: 'true'       # attach the evidence bundle (manifest.json, REPORT.md)
