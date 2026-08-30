@@ -31,12 +31,33 @@ jobs:
         with:
           node-version: 22
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Unit tests (crypto, routing, engine-output parsing)
         run: node --test worker/test/lib.test.mjs
 
+      - name: Mutation engine unit tests
+        run: python3 engine/move-mutate/test/test_movemutate.py
+
+      - name: Outcome classifier is not pipe-dependent
+        # Guards a regression that inverted a real client result: classifying
+        # killed-vs-did-not-compile through `echo | grep -q` under pipefail reports
+        # 141 on SIGPIPE even when the pattern matched, turning every kill into a
+        # compile failure — but only once the output is large enough to race.
+        run: bash engine/test/classify.sh
+
+      - name: The shipped engine measures a nested package
+        # The defect this guards: a flat `sources/*.move` glob derives ZERO mutations
+        # from any package that nests its modules, so our own product reports
+        # "nothing to mutate" on a real client repository. Runs the SHIPPED engine
+        # copy, not the tool it was copied from.
+        run: bash engine/test/app-path.sh
+
       - name: Every shell script parses
         run: |
-          for f in scripts/*.sh engine/ci/*.sh engine/move-mutate/*.sh; do
+          for f in scripts/*.sh engine/ci/*.sh engine/move-mutate/*.sh engine/test/*.sh; do
             bash -n "$f"
             echo "$f: OK"
           done

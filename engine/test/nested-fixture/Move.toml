@@ -1,0 +1,6 @@
+[package]
+name = "NestedFixture"
+edition = "2024.beta"
+
+[addresses]
+nested_fixture = "0x0"

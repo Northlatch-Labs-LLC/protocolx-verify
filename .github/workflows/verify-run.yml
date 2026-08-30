@@ -14,6 +14,10 @@
 #   - The gates step never hard-fails the job: verdicts are read from the engine's own
 #     output, and a gate that never reported is swept to an explicit failure at the end.
 #     "Never ran" must not read as "passed".
+#   - Pinned Python: the mutation engine's derivation and reporting stages are Python 3
+#     (standard library only). It is pinned for the same reason Sui is — a floating
+#     interpreter changes behaviour without a line of any repository changing — and it is
+#     verified present before any client code is touched, with a named error if absent.
 
 name: Verify run
 
@@ -46,6 +50,7 @@ concurrency:
 
 env:
   SUI_VERSION: mainnet-v1.77.2
+  PYTHON_VERSION: '3.11'
 
 jobs:
   verify:
@@ -101,6 +106,29 @@ jobs:
           tar -xzf sui.tgz -C "$HOME/.local/bin" --strip-components=1 || tar -xzf sui.tgz -C "$HOME/.local/bin"
           chmod +x "$HOME/.local/bin/sui"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Python (pinned — the mutation engine's derivation stage)
+        if: steps.cfg.outputs.found == '1'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Verify the mutation engine before touching client code
+        if: steps.cfg.outputs.found == '1'
+        run: |
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "::error title=PVS engine unavailable::python3 is required by the ProtocolX Verify mutation engine and is not on PATH. The mutation-smoke gate cannot run. This is a fault in our runner, not in your repository."
+            exit 1
+          fi
+          echo "python3: $(python3 --version)"
+          # Prove the shipped engine derives mutations from a NESTED package before we
+          # ask it to measure a client's. A silently non-deriving engine would report
+          # "nothing to mutate" against real code, which reads as a broken client repo
+          # when it is a broken product.
+          if ! bash engine/test/app-path.sh; then
+            echo "::error title=PVS engine self-test failed::The shipped mutation engine failed its own nested-package self-test. Refusing to report a mutation verdict on your repository from an engine that cannot measure one. This is a fault in our runner, not in your repository."
+            exit 1
+          fi
 
       - name: Mark gates in progress
         if: steps.cfg.outputs.found == '1'
