@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 """
 movelex — the minimum lexical understanding of Move source that mutation
 derivation needs, and not one feature more.

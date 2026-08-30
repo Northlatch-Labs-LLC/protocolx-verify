@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # gates — the ordered verification gates for a Move package, runnable locally or in CI.
 #

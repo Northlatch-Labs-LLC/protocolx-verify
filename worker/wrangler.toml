@@ -1,4 +1,5 @@
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 # For anyone deploying with wrangler instead of scripts/deploy.sh — same worker, same shape.
 name = "protocolx-verify"
 main = "src/index.js"

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 """
 evidence_bundle — the artifact an auditor asks for, emitted by every run.
 
@@ -149,7 +150,7 @@ ABSENCE_CONVENTION = (
     "means the number was not measured, and the reason is recorded beside it."
 )
 
-# Words REPORT.md may not contain. The estate publishes numbers; a survivor is an
+# Words REPORT.md may not contain. This tool publishes numbers; a survivor is an
 # untested invariant, and the moment a report reaches for security language it has
 # made a claim the measurement does not support. The test suite asserts on this
 # list, which is why it lives here rather than in the test: one source of truth.

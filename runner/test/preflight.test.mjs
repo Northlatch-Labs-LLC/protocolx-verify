@@ -1,4 +1,5 @@
-// Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+// Built-by: @projectx.sui /|\
+// Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // The values a stranger's repository gets to choose, and what we do with them.
 //

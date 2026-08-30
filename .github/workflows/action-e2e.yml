@@ -1,4 +1,5 @@
-# Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # action-e2e — run the composite action for real, on this repository's own nested
 # Move fixture, and assert the OUTCOME rather than hoping for green.
@@ -6,10 +7,10 @@
 # The fixture has four production guards and no test that exercises any of them, so
 # the honest result is: build passes, tests pass (zero tests is a passing suite),
 # digest and pin skip (the fixture deploys nothing and pins nothing), and the
-# mutation-smoke gate FAILS with survivors. That failure is the product working —
-# a demo that only proved the happy path would prove nothing about the one gate
-# that differentiates us. The gates are not tuned to make this pass; the assertion
-# is tuned to expect what an untested package deserves.
+# mutation-smoke gate FAILS with survivors. That failure is the correct measurement.
+# A fixture tuned to go green would exercise the gates without testing any of them,
+# so the gates are not tuned to make this pass; the assertion is tuned to expect
+# what an untested package measures as.
 #
 # What this run proves end to end on a hosted runner: package auto-resolution (a
 # root Move.toml, the "." path), the uid privilege drop under PVS_SANDBOX_REQUIRED=1,

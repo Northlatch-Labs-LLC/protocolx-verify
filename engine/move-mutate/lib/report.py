@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 """
 report — emit the run in Markdown, JSON and SARIF from one manifest.
 
@@ -19,7 +20,7 @@ import sys
 import operators
 
 TOOL_VERSION = "0.2.0"
-TOOL_URI = "https://github.com/Northlatch-Labs-LLC/verification-tools"
+TOOL_URI = "https://github.com/Northlatch-Labs-LLC/protocolx-verify"
 
 INDEPENDENCE_CLAUSE = (
     "This is an internal review by the party that wrote the code. It is evidence, "

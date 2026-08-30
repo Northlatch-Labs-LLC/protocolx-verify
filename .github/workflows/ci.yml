@@ -1,4 +1,5 @@
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # The product that sells gates runs gates on itself. Every pull request here proves,
 # on a machine that has never seen this repository: the crypto and routing logic
@@ -71,6 +72,15 @@ jobs:
 
       - name: Mutation engine unit tests
         run: python3 engine/move-mutate/test/test_movemutate.py
+
+      - name: The tamper tripwire trips in a tree with no worker/
+        # A security control, not a path check. The tripwire used to be three copies of
+        # `find runner worker engine action` inside action.yml, and `find` EXITS
+        # NON-ZERO on a directory that does not exist — so in any tree shipped without
+        # one of them it errored instead of tripping, under `set -e`, and an errored
+        # tripwire is an absent one. This builds a worker-less tree, arms it, edits a
+        # file under engine/ and asserts the run is refused with `PVS sandbox breach`.
+        run: bash runner/test/tripwire.test.sh
 
       - name: Runner wiring (measurement must not depend on reporting)
         # Structural, on purpose. The gates were once conditioned on a step whose only

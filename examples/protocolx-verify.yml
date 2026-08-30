@@ -1,3 +1,6 @@
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
+#
 # ProtocolX Verify — copy this file to .github/workflows/protocolx-verify.yml
 #
 # Five verification gates for your Sui Move package — build, deployed-digest guard,
@@ -26,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: Northlatch-Labs-LLC/protocolx-verify@v1
-        # All inputs are optional. The defaults are the product.
+        # All inputs are optional; the defaults suit most repositories.
         # with:
         #   package: sui-contracts        # path to the Move package, when auto-detection is ambiguous
         #   mutation-limit: '5'           # mutations executed per run; each one costs a test-suite run

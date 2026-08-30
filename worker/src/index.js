@@ -1,4 +1,5 @@
-// Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+// Built-by: @projectx.sui /|\
+// Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // ProtocolX Verify — the webhook receiver, deployed as a Cloudflare Worker.
 //

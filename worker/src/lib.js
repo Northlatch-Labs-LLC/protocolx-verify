@@ -1,4 +1,5 @@
-// Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+// Built-by: @projectx.sui /|\
+// Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // The pure logic of ProtocolX Verify, shared by the Cloudflare Worker (webhook receiver)
 // and the GitHub Actions runner scripts. Everything here is isomorphic — Web Crypto only,

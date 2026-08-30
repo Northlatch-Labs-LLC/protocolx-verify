@@ -1,4 +1,5 @@
-// Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+// Built-by: @projectx.sui /|\
+// Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // Unit tests for the pure logic — run with: node --test worker/test/
 // The crypto tests verify against Node's own crypto as the independent implementation:

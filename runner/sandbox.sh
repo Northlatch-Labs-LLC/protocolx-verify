@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
+# Built-by: @projectx.sui /|\
+# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # sandbox — run untrusted client code with no credentials within reach.
 #
 # THE THREAT THIS EXISTS FOR. ProtocolX Verify fetches a stranger's repository and runs
 # `sui move build`, `sui move test`, the mutation engine, and — because gates.sh honours
 # it — the client's own `scripts/check-framework-pin.sh`, which is arbitrary shell. In
-# the same GitHub Actions job the runner holds a GitHub App installation token and, in
-# the minting step, the App private key itself. Those two facts must never be true of
-# the same process.
+# In some deployments the same job also holds credentials of its own. Those two facts
+# must never be true of the same process.
 #
 # This wrapper enforces the separation at the only two boundaries a shell can reach:
 #
@@ -46,7 +46,7 @@ set -uo pipefail
 
 # A name is refused if it looks like a credential, if it belongs to the runner's own
 # control plane, or if it is one of our own storage handles — EVIDENCE_STORE and
-# USAGE_LEDGER are not secrets, but they are write handles to the estate's records and
+# USAGE_LEDGER are not secrets, but they are write handles to our own records and
 # the client's build has no business holding one. Anchored on underscore boundaries so
 # PATH is not caught by PAT.
 #
