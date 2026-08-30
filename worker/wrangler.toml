@@ -3,3 +3,32 @@
 name = "protocolx-verify"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
+
+# --- the evidence permalink, deliberately not enabled -------------------------
+#
+# The content-addressed evidence store needs a KV namespace bound as EVIDENCE_STORE and
+# the var EVIDENCE_STORE_ENABLED set to exactly "on". Both are commented out, and the
+# namespace does not exist yet: publishing real client evidence is the Owner's product
+# decision, not a side effect of a deploy.
+#
+# Note that scripts/deploy.sh — the path this worker is actually deployed by — uploads
+# the script with no bindings and no vars at all, so the feature is inert there whatever
+# this file says. Uncommenting these only matters for a wrangler deploy.
+#
+# To enable, once the ruling is in:
+#   1. create the namespace (the API token the estate already holds can do this; no
+#      dashboard trip, no new vendor):
+#        curl -sS -X POST \
+#          "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces" \
+#          -H "Authorization: Bearer $(cat ~/.config/protocolx/cloudflare-workers.token)" \
+#          -H 'Content-Type: application/json' \
+#          --data '{"title":"protocolx-verify-evidence"}'
+#   2. put the returned id below, uncomment both blocks, and set the write token:
+#        scripts/set-worker-secret.sh EVIDENCE_WRITE_TOKEN
+#
+# [vars]
+# EVIDENCE_STORE_ENABLED = "on"
+#
+# [[kv_namespaces]]
+# binding = "EVIDENCE_STORE"
+# id = "<namespace id from step 1>"

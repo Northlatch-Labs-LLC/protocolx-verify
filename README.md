@@ -94,6 +94,59 @@ The check-run summary is rendered in JavaScript (`evidenceSummary` in
 exists twice. `engine/test/test_evidence_bundle.py` reads the JavaScript mirror and
 fails if the two ever disagree.
 
+### The evidence permalink — built, not enabled
+
+`GET /evidence/<sha256-hex>` on the worker serves a bundle's manifest, and **the URL is
+the digest**. `PUT /evidence/` stores one, authenticated with `EVIDENCE_WRITE_TOKEN`.
+The worker derives the address from the content and refuses any document whose stated
+`bundleDigest` is not its real digest — a content-addressed store that trusts the
+address it is handed is a filing cabinet, not a store. It re-verifies on the way out
+too, so it will not serve a document that does not hash to the address it was asked
+for, even if our own storage were corrupted.
+
+**A third party can check it with nothing of ours.** Python standard library, no
+network beyond the fetch, no code we wrote:
+
+```
+curl -s https://<worker>/evidence/<digest> | python3 -c \
+'import sys,json,hashlib; m=json.load(sys.stdin); \
+p={k:v for k,v in m.items() if k not in ("run","bundleDigest")}; \
+print("sha256:"+hashlib.sha256(json.dumps(p,sort_keys=True,separators=(",",":")).encode()).hexdigest())'
+```
+
+If that prints the digest in the URL, the document has not been edited since we wrote
+it. That is what "self-verifying" means here, and it is worth being exact about what it
+does **not** mean: the digest proves *what* the document says and that it is unaltered.
+It does not prove the measurement is true, and it does not prove *when* it was made —
+this URL is served by us, on our clock, for as long as we choose to serve it. An
+independent timestamp needs an anchor outside our control.
+
+**It is inert.** Three things must all be true before a byte is stored or served:
+`EVIDENCE_STORE_ENABLED` is exactly `"on"` (not `"true"`, not `"1"`), a KV namespace is
+bound as `EVIDENCE_STORE`, and `EVIDENCE_WRITE_TOKEN` is set for writes. None is, and
+the namespace does not exist. `scripts/deploy.sh` uploads the worker with no bindings
+and no vars, so on the deploy path we actually use, the feature **cannot** be on. That
+is the safety, not an oversight. `/healthz` reports `evidence_store: disabled`.
+
+**Storage: Workers KV, and here is why.** Checked on the account on 2026-08-30: R2 is
+not enabled (`10042 — Please enable R2 through the Cloudflare Dashboard`) and there are
+zero KV namespaces. So the estate holds *neither* today. KV wins because it can be
+provisioned entirely by API with the Workers token the estate already has — no console
+trip, no terms to accept, no new vendor — and the workload suits it: manifests are 4–8 KB,
+immutable, write-once-read-many, and far under KV's value-size limit. Eventual
+consistency is harmless for content-addressed immutable blobs, where a read-after-write
+miss is a brief 404 on a key whose content can never change.
+
+The honest counterpoint: KV's free tier caps daily writes far lower than R2's monthly
+operation allowance, so at high run volume R2 becomes the better home — and enabling R2
+needs a one-time dashboard action. The store is reached through two calls (`get`/`put`)
+for exactly that reason: moving to R2 later is a binding swap, not a rewrite. **Confirm
+both tiers' current limits before enabling; they are quoted here from documentation, not
+from a reading taken in this session.**
+
+Wiring the runner to publish each bundle is deliberately *not* in this change. That step
+is what turns it on, and turning it on for real client evidence is the Owner's call.
+
 Build one locally from a finished gate run:
 
 ```

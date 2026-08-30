@@ -38,6 +38,13 @@ jobs:
       - name: Unit tests (crypto, routing, engine-output parsing)
         run: node --test worker/test/lib.test.mjs
 
+      - name: Evidence store and cross-language digest
+        # The bundle's digest is computed in Python and re-computed in JavaScript. If
+        # the two ever disagree the content-addressed store rejects real bundles, so
+        # these hash manifests the Python writer actually produced — including ones
+        # stuffed with the characters most likely to split the two implementations.
+        run: node --test worker/test/evidence-store.test.mjs
+
       - name: Mutation engine unit tests
         run: python3 engine/move-mutate/test/test_movemutate.py
 
@@ -75,6 +82,7 @@ jobs:
           node --check worker/src/lib.js
           node --check runner/mint-token.mjs
           node --check runner/report-gates.mjs
+          node --check worker/test/evidence-store.test.mjs
 
       - name: Engine copies match their recorded hashes
         run: sha256sum -c engine/CHECKSUMS
