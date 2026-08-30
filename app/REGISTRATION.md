@@ -1,11 +1,17 @@
-# Registering ProtocolX Verify — the Owner's card
+# Registering ProtocolX Verify
+
+> **`$CF_ACCOUNT_ID` is a placeholder and must stay one.** This file is in a repository on a
+> publication path. An account identifier committed here is public the moment the repo is, and
+> git history cannot be rewritten on this project. Export it in your shell; never paste the value.
+> Absolute local paths are likewise replaced with `./` — a path naming somebody's home directory
+> tells a reader the machine layout and helps nobody run anything.
 
 Seven stations, in order. Stations 1, 3 and 5 need your hands (tokens, the app, a key);
 everything else is one command. Each step says what it is before what to press.
 
 ## 1 — A Cloudflare token that can deploy workers (~2 min)
 
-The desk's existing Cloudflare token manages DNS only — tested against the API, it
+The existing Cloudflare token manages DNS only — tested against the API, it
 cannot touch Workers. Deploying needs its own token:
 
 1. Open https://dash.cloudflare.com → My Profile → **API Tokens** → **Create Token**.
@@ -27,7 +33,7 @@ chmod 600 ~/.config/protocolx/cloudflare-workers.token
 ## 2 — Deploy the worker (one command)
 
 ```bash
-CF_ACCOUNT_ID=e5f84b4c42f43ef40f16b8c4b8c26dff bash /Users/admin/WORK.CLAUDE/protocolx-verify/scripts/deploy.sh
+CF_ACCOUNT_ID=$CF_ACCOUNT_ID bash ./scripts/deploy.sh
 ```
 
 That account id is yours (read live from the API). The script prints three URLs —
@@ -68,7 +74,7 @@ openssl pkcs8 -topk8 -nocrypt -in ~/Downloads/*.private-key.pem -out ~/Downloads
 The runner is this repo's own workflow; it needs to live on GitHub to be dispatchable:
 
 ```bash
-gh repo create Northlatch-Labs-LLC/protocolx-verify --private --source /Users/admin/WORK.CLAUDE/protocolx-verify --push
+gh repo create Northlatch-Labs-LLC/protocolx-verify --private --source . --push
 ```
 
 Then add two Actions secrets (Settings → Secrets and variables → Actions):
@@ -87,7 +93,7 @@ The worker starts runner jobs with a fine-grained personal access token:
 ## 6 — Set the worker's secrets (one command each; values via stdin, never in history)
 
 ```bash
-CF_ACCOUNT_ID=e5f84b4c42f43ef40f16b8c4b8c26dff bash /Users/admin/WORK.CLAUDE/protocolx-verify/scripts/set-worker-secret.sh GH_APP_ID
+CF_ACCOUNT_ID=$CF_ACCOUNT_ID bash ./scripts/set-worker-secret.sh GH_APP_ID
 ```
 
 Type the App ID, Enter, Ctrl+D. Repeat the same command shape for:
@@ -98,7 +104,7 @@ Type the App ID, Enter, Ctrl+D. Repeat the same command shape for:
 - `GH_APP_PRIVATE_KEY` — feed the file instead of typing:
 
 ```bash
-CF_ACCOUNT_ID=e5f84b4c42f43ef40f16b8c4b8c26dff bash /Users/admin/WORK.CLAUDE/protocolx-verify/scripts/set-worker-secret.sh GH_APP_PRIVATE_KEY < ~/Downloads/app-pkcs8.pem
+CF_ACCOUNT_ID=$CF_ACCOUNT_ID bash ./scripts/set-worker-secret.sh GH_APP_PRIVATE_KEY < ~/Downloads/app-pkcs8.pem
 ```
 
 Check the door: open the `/healthz` URL — it should say `"ok": true, "missing": []`.

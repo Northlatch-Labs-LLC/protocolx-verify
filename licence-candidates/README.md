@@ -9,7 +9,7 @@ kept so the estate can show what it weighed and what it rejected.
 
 | File | What it is |
 |---|---|
-| `DECISION-RESOLVED-2026-08-30.md` | The decision pack as it was put to the Master, and the ruling. **Read this first.** |
+| `DECISION-RESOLVED-2026-08-30.md` | The licence decision and its reasoning. |
 | `BUSL-1.1.txt` | The **chosen** licence, as drafted. Superseded by `LICENSE` at the root, which corrects three things — see the resolved decision doc. |
 | `Apache-2.0.txt` | **Considered and not chosen.** Kept deliberately. |
 
