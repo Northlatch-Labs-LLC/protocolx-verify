@@ -6,7 +6,7 @@
 #
 # WHY THIS EXISTS. On 2026-08-30 the shipped engine was found missing
 # lib/shadow.py entirely, hours after being synced from canonical. The App
-# ran a measurably different engine from the one the desk runs in-house.
+# ran a measurably different engine from the canonical one.
 # That is the precise failure our own digest gate sells against — the thing
 # that runs is not the thing in the repository. We cannot sell drift defence
 # while shipping drift.
