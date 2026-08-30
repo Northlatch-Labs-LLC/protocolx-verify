@@ -12,7 +12,7 @@ run by our engine, reported on their commit:
 - **PVS · mutation-smoke** — a slice of mutation testing per PR (the full run stays a
   scheduled job — it costs one suite run per assert)
 
-Most projects publish adjectives; this app publishes numbers. Ordered by the Owner
+Most projects publish adjectives; this app publishes numbers. Ordered
 2026-08-27 (brief §4.5), built 2026-08-28.
 
 Every run also emits an **evidence bundle** — the file an auditor asks for, since a
@@ -153,7 +153,7 @@ runner/            mint-token.mjs (App JWT → installation token) · report-gat
   lib/preflight.mjs    the pure half of that, unit tested
   test/                preflight.test.mjs · secret-distance.sh · workflow-audit.py
 scripts/           deploy.sh (API deploy, no wrangler) · set-worker-secret.sh
-app/               REGISTRATION.md (the Owner's card) · app-manifest.json
+app/               REGISTRATION.md · app-manifest.json
 action.yml         the composite GitHub Action — same engine, run in the client's CI
 action/            resolve-package.mjs (zero-config package discovery) · summary.mjs
                    (step summary, outputs, and the verdict exit code)
@@ -278,7 +278,7 @@ both tiers' current limits before enabling; they are quoted from documentation, 
 a reading taken against the account.**
 
 Wiring the runner to publish each bundle is deliberately *not* in this change. That step
-is what turns it on, and turning it on for real client evidence is the Owner's call.
+is what turns it on. Turning it on for real client evidence is a deliberate decision, not a default.
 
 Build one locally from a finished gate run:
 
@@ -317,7 +317,7 @@ we measured is a breach of the thing we sell.
 **Absence is not zero, here as everywhere.** A repository with no recorded batch reads
 as `{"value": null, "reason": "…"}` — never `0`, and its `billable` flag is `null`,
 never `false`. The two facts are not the same: a silent zero under-bills a paying
-customer *and* tells the desk they are idle when they are not. The reason names the
+customer *and* reports them idle when they are not. The reason names the
 date the ledger began observing that installation and says plainly that a failed write
 looks identical to a run that never happened. This is the convention
 `engine/evidence/evidence_bundle.py` already holds the estate to, applied to money.

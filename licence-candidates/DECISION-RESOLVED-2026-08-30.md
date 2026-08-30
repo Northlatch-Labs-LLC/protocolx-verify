@@ -1,6 +1,6 @@
 # LICENCE — RESOLVED 2026-08-30. BUSL-1.1 IS IN FORCE.
 
-> **The Master ruled it. His word, verbatim, 2026-08-30: "Move to BUSL".**
+> **Decided 2026-08-30: BUSL-1.1.**
 >
 > `LICENSE` now exists at the repository root and carries the Business Source
 > License 1.1 with the Additional Use Grant. **Apache-2.0 was considered and was not
@@ -25,7 +25,7 @@ packages (`projectx_raffle`, `comp_probe`, `projectx_social`):
 | Change License | Apache License, Version 2.0 |
 | Additional Use Grant | production use on your own code, including your own CI; no hosted resale |
 
-**Four things still want the Master's eye. None of them blocks the tree; all of them
+**Four things remain open. None of them blocks the tree; all of them
 are cheaper to change now than after a public tag.**
 
 1. **The Change Date, `2030-08-30`, is out of step with the rest of the estate.**
@@ -105,7 +105,7 @@ same afternoon.
 | reselling it or hosting it for others | **permitted** |
 | OSI "open source" | yes |
 
-## The desk's reading, offered and not acted on
+## The reasoning behind the choice
 
 BUSL-1.1 with the use grant. The trust argument this product rests on **requires** that a
 buyer can read `runner/sandbox.sh` and `runner/tripwire.sh` and satisfy themselves the

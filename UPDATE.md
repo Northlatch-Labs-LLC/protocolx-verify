@@ -8,8 +8,7 @@ anything a desk told you, **this wins** — and the newer entry wins over the ol
 entry that contradicts a newer one is not a conflict to resolve; it was already superseded.
 
 Never edit an old entry to agree with a new one. Never delete one. Add, and say what you
-superseded. Append with `operations/watcher/note-update.sh verify "<summary>"`.
-Law: `operations/company/UPDATE-FILE-LAW.md`.
+superseded.
 
 ---
 
@@ -35,7 +34,7 @@ adds a CI gate that fails when the two diverge. The gate was proven by deleting 
 reproducing the defect, catching it three ways, and restoring it — with true exit codes checked
 without a pipe: 1 on drift, 0 on clean.
 
-- **Open:** that work sits on branches, uncommitted, awaiting the Master's word.
+- **Open:** that work is staged and not yet landed.
 - **Note:** this repository is on a publication path. **This file will be read by clients.** Keep
   it to what a client may see — no prospect names, no unpublished prices, no internal
-  deliberation. The estate's private record of this product is in `operations/UPDATE.md`.
+  deliberation. Internal notes on this product are kept outside this repository.
