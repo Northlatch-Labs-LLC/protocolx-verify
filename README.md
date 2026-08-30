@@ -96,6 +96,67 @@ The check-run summary is rendered in JavaScript (`evidenceSummary` in
 exists twice. `engine/test/test_evidence_bundle.py` reads the JavaScript mirror and
 fails if the two ever disagree.
 
+### The evidence permalink — built, not enabled
+
+`GET /evidence/<sha256-hex>` on the worker serves a bundle's manifest, and **the URL is
+the digest**. `PUT /evidence/` stores one, authenticated with `EVIDENCE_WRITE_TOKEN`.
+The worker derives the address from the content and refuses any document whose stated
+`bundleDigest` is not its real digest — a content-addressed store that trusts the
+address it is handed is a filing cabinet, not a store. It re-verifies on the way out
+too, so it will not serve a document that does not hash to the address it was asked
+for, even if our own storage were corrupted.
+
+**A third party can check it with nothing of ours.** Python standard library, no
+network beyond the fetch, no code we wrote:
+
+```
+curl -s https://<worker>/evidence/<digest> | python3 -c \
+'import sys,json,hashlib; m=json.load(sys.stdin); \
+p={k:v for k,v in m.items() if k not in ("run","bundleDigest")}; \
+print("sha256:"+hashlib.sha256(json.dumps(p,sort_keys=True,separators=(",",":")).encode()).hexdigest())'
+```
+
+If that prints the digest in the URL, the document has not been edited since we wrote
+it. That is what "self-verifying" means here, and it is worth being exact about what it
+does **not** mean: the digest proves *what* the document says and that it is unaltered.
+It does not prove the measurement is true, and it does not prove *when* it was made —
+this URL is served by us, on our clock, for as long as we choose to serve it. An
+independent timestamp needs an anchor outside our control.
+
+**It is inert.** Three things must all be true before a byte is stored or served:
+`EVIDENCE_STORE_ENABLED` is exactly `"on"` (not `"true"`, not `"1"`), a KV namespace is
+bound as `EVIDENCE_STORE`, and `EVIDENCE_WRITE_TOKEN` is set for writes. None is, and
+the namespace does not exist. `scripts/deploy.sh` uploads the worker with no bindings
+and no vars, so on the deploy path we actually use, the feature **cannot** be on. That
+is the safety, not an oversight. `/healthz` reports `evidence_store: disabled`.
+
+**Storage: Workers KV**, on the account measurement recorded once under *The usage
+ledger* below — R2 not enabled, D1 unreachable with the token that runs our deploys, KV
+reachable today. That table is the single record of those facts deliberately: two copies
+of an account measurement in one README is two copies that will disagree by next month.
+
+What is specific to this store rather than to that choice: manifests are 4–8 KB,
+immutable, and write-once-read-many, well under KV's value-size limit, and eventual
+consistency is harmless for content-addressed blobs — a read-after-write miss is a brief
+404 on a key whose content can never change. Note that KV's *lack of atomic increment*,
+the flaw that shaped the ledger's append-only counter, costs this store nothing: it
+never increments anything.
+
+It wants its **own namespace**, not a shared one with prefixed keys. The ledger holds a
+customer list that must never be public; this holds documents whose entire purpose is to
+be fetched by strangers. One namespace would mean one binding, one blast radius, and one
+mistake away from serving the metering data at a public URL.
+
+The honest counterpoint: KV's free tier caps daily writes far lower than R2's monthly
+operation allowance, so at high run volume R2 becomes the better home — and enabling R2
+needs that one-time console trip. The store is reached through two calls (`get`/`put`)
+for exactly that reason: moving to R2 later is a binding swap, not a rewrite. **Confirm
+both tiers' current limits before enabling; they are quoted from documentation, not from
+a reading taken against the account.**
+
+Wiring the runner to publish each bundle is deliberately *not* in this change. That step
+is what turns it on, and turning it on for real client evidence is the Owner's call.
+
 Build one locally from a finished gate run:
 
 ```
@@ -254,9 +315,19 @@ whose every write failed reads as a known measurement failure rather than an idl
 account, the stored records carry no trace of what the client's code contains, and
 `/usage` serves nobody when its secret is unset.
 
-**Built but inert:** the usage ledger. The code is here and tested; no KV
-namespace exists and no binding is declared, so nothing is being recorded yet.
-Provisioning it is two commands in `worker/wrangler.toml`.
+21 further tests under `node --test` for the evidence permalink: the digest computed in
+JavaScript is checked against manifests the Python writer actually produced — including
+one carrying an em dash, an emoji, a quote, a backslash and a tab — the store is proven
+silent under every value of its switch other than `"on"`, an edited document is proven
+unable to keep the original digest, and a corrupted store is proven to refuse to serve
+rather than break its own promise.
+
+**Built but inert:** the usage ledger and the evidence permalink. Both are here and
+tested; no KV namespace exists for either, no binding is declared, and
+`scripts/deploy.sh` uploads no bindings at all, so nothing is recorded and nothing is
+published. They are independent — each has its own namespace, secret and switch, and
+turning one on does not touch the other. Provisioning either is two commands in
+`worker/wrangler.toml`.
 
 **Deliberately not built (road 2 — after the first service dollar):** billing
 itself — payment processing, cards, subscriptions, any third-party billing vendor.
