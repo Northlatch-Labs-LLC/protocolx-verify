@@ -3,3 +3,42 @@
 name = "protocolx-verify"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
+
+# --- the usage ledger ---------------------------------------------------------
+#
+# The metering that makes a $149/repository/month invoice possible. It needs one KV
+# namespace bound as USAGE_LEDGER and one secret, LEDGER_READ_TOKEN, for the read
+# endpoint. Neither exists yet, and scripts/deploy.sh — the path this worker is
+# actually deployed by — uploads the script with no bindings at all, so today the
+# ledger records nothing and /healthz says `usage_ledger: not bound`.
+#
+# It is inert, not broken: with no binding the webhook path is untouched and the read
+# endpoint answers a named 503. It never answers "zero usage", because it has not
+# measured zero — it has measured nothing.
+#
+# STORAGE: Workers KV, chosen on measurement taken 2026-08-30 against the estate's own
+# account (e5f84b4c…) with the estate's own Workers token:
+#   - R2   → 403, `10042 — Please enable R2 through the Cloudflare Dashboard`. Not
+#            enabled, and enabling it is a console trip.
+#   - D1   → `10000 Authentication error` with the estate's Workers token. The product
+#            is on the account but the token that runs our deploys cannot provision or
+#            bind it, so choosing D1 means minting and custodying a second token.
+#   - KV   → lists clean (zero namespaces). The estate's token reaches it today.
+# KV also has no atomic increment, which is exactly why the run counter is append-only
+# (one key per delivery, count the distinct delivery ids) rather than read-modify-write.
+# The store is reached through three calls — get/put/list — so moving to D1 or R2 later
+# is a binding swap, not a rewrite.
+#
+# To enable, once the ruling is in:
+#   1. create the namespace with the token the estate already holds:
+#        curl -sS -X POST \
+#          "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces" \
+#          -H "Authorization: Bearer $(cat ~/.config/protocolx/cloudflare-workers.token)" \
+#          -H 'Content-Type: application/json' \
+#          --data '{"title":"protocolx-verify-usage-ledger"}'
+#   2. put the returned id below, uncomment the block, and set the read secret:
+#        scripts/set-worker-secret.sh LEDGER_READ_TOKEN
+#
+# [[kv_namespaces]]
+# binding = "USAGE_LEDGER"
+# id = "<namespace id from step 1>"

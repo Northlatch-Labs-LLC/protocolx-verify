@@ -12,10 +12,57 @@
 // 503 naming what is missing, never a guess. Nothing about an org, repo, or account is
 // hardcoded.
 
-import { verifyWebhookSignature, appJwt, routeEvent, GATES, checkName } from './lib.js';
+import { verifyWebhookSignature, appJwt, routeEvent, GATES, checkName, timingSafeEqual } from './lib.js';
+import {
+  LEDGER_EVENTS, usageLedger, recordInstallationEvent, recordRunBatch, usageSnapshot,
+} from './ledger.js';
 
 const REQUIRED = ['GH_APP_ID', 'GH_WEBHOOK_SECRET', 'GH_APP_PRIVATE_KEY', 'RUNNER_REPO', 'RUNNER_TOKEN'];
 const missingConfig = (env) => REQUIRED.filter((name) => !env[name]);
+
+// --- the usage read endpoint ---------------------------------------------------
+//
+// GET /usage — the picture a human reads on the first of the month to write invoices.
+// It is authenticated and it FAILS CLOSED: with LEDGER_READ_TOKEN unset the endpoint
+// serves nobody, not even the operator, because a metering document names every
+// account and repository we have ever run for and an unauthenticated one is a customer
+// list on the open internet.
+//
+// Optional ?from= and ?to= bound the window (ISO instants). Both are stated back in the
+// response, so nobody has to work out which month they are holding.
+async function serveUsage(request, env, url) {
+  if (!env.LEDGER_READ_TOKEN) {
+    return Response.json({ error: 'unconfigured', missing: ['LEDGER_READ_TOKEN'] }, { status: 503 });
+  }
+  const header = request.headers.get('authorization') ?? '';
+  const presented = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';
+  const enc = new TextEncoder();
+  if (!timingSafeEqual(enc.encode(presented), enc.encode(env.LEDGER_READ_TOKEN))) {
+    return Response.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  const result = await usageSnapshot(env, {
+    from: url.searchParams.get('from'),
+    to: url.searchParams.get('to'),
+  });
+  if (!result.ok) {
+    // Named absence, never an empty picture. An unbound ledger answering "0 billable
+    // repositories" would be the single most expensive lie this service could tell.
+    return Response.json(
+      {
+        error: 'unconfigured',
+        missing: result.missing,
+        detail: 'The usage ledger is not bound, so nothing has been recorded and nothing '
+          + 'can be reported. This is not a reading of zero usage.',
+      },
+      { status: 503 },
+    );
+  }
+  return Response.json(result.snapshot, {
+    status: 200,
+    headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' },
+  });
+}
 
 const API = 'https://api.github.com';
 
@@ -50,8 +97,17 @@ export default {
 
     if (url.pathname === '/healthz' && request.method === 'GET') {
       const missing = missingConfig(env);
-      return Response.json({ service: 'protocolx-verify', ok: missing.length === 0, missing });
+      return Response.json({
+        service: 'protocolx-verify',
+        ok: missing.length === 0,
+        missing,
+        // Reported so an operator can see at a glance whether usage is being metered,
+        // rather than discovering on the first of the month that it was not.
+        usage_ledger: usageLedger(env).ok ? 'recording' : 'not bound',
+      });
     }
+
+    if (url.pathname === '/usage' && request.method === 'GET') return serveUsage(request, env, url);
 
     if (url.pathname !== '/webhook' || request.method !== 'POST') {
       return Response.json({ error: 'not found' }, { status: 404 });
@@ -78,7 +134,23 @@ export default {
       return Response.json({ error: 'body is not JSON' }, { status: 400 });
     }
 
-    const route = routeEvent(request.headers.get('x-github-event'), payload);
+    const ghEvent = request.headers.get('x-github-event');
+    // GitHub's own delivery guid. It is the run counter's uniqueness key: opaque, tells
+    // us nothing about the client's code, and identical across GitHub's redeliveries of
+    // the same event, so a retry cannot inflate an invoice.
+    const deliveryId = request.headers.get('x-github-delivery');
+
+    // The App-lifecycle events. GitHub delivers these to a GitHub App's webhook whether
+    // or not the App subscribes to them — our own delivery log proves it: the App's
+    // event list does not contain "installation" and the installation/created delivery
+    // arrived anyway. They start no verification; they only feed the ledger.
+    if (LEDGER_EVENTS.includes(ghEvent)) {
+      const ledger = await recordInstallationEvent(env, ghEvent, payload, { deliveryId });
+      if (!ledger.recorded) console.error(`usage-ledger: ${ghEvent}/${payload?.action}: ${ledger.reason}`);
+      return Response.json({ ok: true, event: ghEvent, action: payload?.action ?? null, ledger }, { status: 202 });
+    }
+
+    const route = routeEvent(ghEvent, payload);
     if (route.kind === 'pong') return Response.json({ ok: true, pong: true });
     if (route.kind === 'ignore') return Response.json({ ok: true, ignored: route.reason }, { status: 202 });
     if (!route.installationId || !route.repository || !route.headSha) {
@@ -130,8 +202,31 @@ export default {
       return Response.json({ error: `runner dispatch failed: ${note}` }, { status: 502 });
     }
 
+    // The batch is delivered: five check runs are open on the client's commit and the
+    // runner that fills them is dispatched. THAT is the billable unit, and it is counted
+    // here and nowhere earlier — a batch whose runner never started returned 502 above
+    // and is work we did not deliver, so it is work we do not bill.
+    //
+    // The ledger never blocks the client. If the count cannot be written the run still
+    // stands; the failure is returned and logged so it is visible rather than silent.
+    const ledger = await recordRunBatch(env, {
+      installationId: route.installationId,
+      repository: route.repository,
+      deliveryId,
+    });
+    if (!ledger.recorded) {
+      console.error(`usage-ledger: batch for ${route.repository} NOT counted: ${ledger.reason}`
+        + ` (fault marker written: ${ledger.faultRecorded === true})`);
+    }
+
     return Response.json(
-      { ok: true, repository: route.repository, head_sha: route.headSha, check_runs: checkRuns },
+      {
+        ok: true,
+        repository: route.repository,
+        head_sha: route.headSha,
+        check_runs: checkRuns,
+        ledger,
+      },
       { status: 202 },
     );
   },
