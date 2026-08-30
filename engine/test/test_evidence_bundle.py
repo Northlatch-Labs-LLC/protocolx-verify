@@ -342,6 +342,29 @@ class TestHumanReport(unittest.TestCase):
         self.assertIn("generation timestamp", self.text)
 
 
+class TestTheTwoForbiddenListsCannotDrift(unittest.TestCase):
+    """The check-run summary is rendered in JavaScript, the report in Python.
+
+    Two languages means two copies of the list of words neither may say, and two
+    copies drift. This reads the JavaScript mirror out of the worker's lib and
+    fails the moment it stops matching the Python original, so the check run —
+    the most visible surface we own, on a client's own pull request — cannot
+    quietly acquire security language that REPORT.md still forbids.
+    """
+
+    def test_the_javascript_mirror_matches_the_python_original(self):
+        path = os.path.join(REPO_ROOT, "worker", "src", "lib.js")
+        with open(path, encoding="utf-8") as fh:
+            js = fh.read()
+        m = re.search(r"FORBIDDEN_SUMMARY_TERMS\s*=\s*\[(.*?)\]", js, re.S)
+        self.assertIsNotNone(m, "worker/src/lib.js no longer exports "
+                                "FORBIDDEN_SUMMARY_TERMS as an array literal")
+        mirror = set(re.findall(r"'([^']+)'", m.group(1)))
+        self.assertEqual(mirror, set(eb.FORBIDDEN_REPORT_TERMS),
+                         "the check-run summary's forbidden-word list has drifted from "
+                         "the report's. Both must forbid exactly the same words.")
+
+
 class TestWritesBothFiles(unittest.TestCase):
     def test_main_writes_manifest_and_report(self):
         with tempfile.TemporaryDirectory() as out:

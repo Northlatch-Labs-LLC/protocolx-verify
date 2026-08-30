@@ -8,6 +8,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac, generateKeyPairSync, verify as rsaVerify } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   verifyWebhookSignature,
@@ -15,7 +19,9 @@ import {
   pemToPkcs8Bytes,
   routeEvent,
   parseGatesOutput,
+  evidenceSummary,
   timingSafeEqual,
+  FORBIDDEN_SUMMARY_TERMS,
   GATES,
   checkName,
 } from '../src/lib.js';
@@ -131,4 +137,100 @@ test('parseGatesOutput: reads the engine format — pass, fail, skipped, silent'
 test('gate names are stable product surface', () => {
   assert.deepEqual(GATES, ['build', 'digest', 'tests', 'pin', 'mutation-smoke']);
   assert.equal(checkName('build'), 'PVS · build');
+});
+
+// --- the evidence summary on the check run -----------------------------------
+//
+// These build a REAL manifest by running the Python writer against the recorded
+// nested-fixture gate run, rather than hand-writing a mock. A mock of the manifest
+// would drift from the writer the first time a field moved, and the renderer would
+// keep passing its tests while rendering nothing on a client's pull request.
+
+const REPO_ROOT = new URL('../../', import.meta.url).pathname;
+
+function realManifest(extraArgs = []) {
+  const out = mkdtempSync(join(tmpdir(), 'pvs-evidence-'));
+  execFileSync('python3', [
+    join(REPO_ROOT, 'engine/evidence/evidence_bundle.py'),
+    '--out', out,
+    '--repository', 'Northlatch-Labs-LLC/nested-fixture',
+    '--commit', 'eaad914a40513abb1a530340c0a2edb1d7f31e1f',
+    '--package-path', 'sui-contracts',
+    '--mutation-limit', '5',
+    '--generated-at', '2026-08-30T00:00:00Z',
+    ...extraArgs,
+  ], { stdio: 'pipe' });
+  return JSON.parse(readFileSync(join(out, 'manifest.json'), 'utf8'));
+}
+
+const FIXTURES = join(REPO_ROOT, 'engine/test/fixtures');
+const MEASURED_ARGS = [
+  '--gates-log', join(FIXTURES, 'nested-fixture-gates.log'),
+  '--mutation-report', join(FIXTURES, 'nested-fixture-mutation-report.json'),
+];
+
+test('evidence summary carries the digest and the counts onto the check run', () => {
+  const manifest = realManifest(MEASURED_ARGS);
+  const summary = evidenceSummary(manifest, 'mutation-smoke');
+
+  assert.ok(summary.includes(manifest.bundleDigest), 'the digest must be on the check run');
+  assert.match(summary, /Internal review of the code as committed at eaad914a40513abb1a530340c0a2edb1d7f31e1f — measured evidence, not an audit/);
+  assert.ok(summary.includes(manifest.independenceClause));
+  // The engine's real numbers from the recorded run, verbatim.
+  assert.match(summary, /killed 0/);
+  assert.match(summary, /survived 4/);
+  assert.match(summary, /executed 4/);
+  assert.match(summary, /excluded 4/);
+  assert.match(summary, /skipped 0/);
+});
+
+test('evidence summary renders an unmeasured count as its reason, never as zero', () => {
+  // No gates log at all: nothing was measured, and the summary must say so rather
+  // than printing a column of zeroes that reads as a clean run.
+  const manifest = realManifest(['--gates-log', '/nonexistent/gates.log']);
+  const summary = evidenceSummary(manifest, 'mutation-smoke');
+
+  assert.match(summary, /no counts\./i);
+  assert.ok(!/survived 0/.test(summary), 'an unmeasured survivor count must not render as 0');
+  assert.ok(!/killed 0/.test(summary), 'an unmeasured kill count must not render as 0');
+  for (const gate of GATES) assert.match(summary, new RegExp(`${gate} \\*\\*not-run\\*\\*`));
+});
+
+test('evidence summary renders a partially measured run without inventing the rest', () => {
+  // The gates ran, but no unlimited derivation was recorded: the count that exists
+  // is published and the one that does not is named, in the same line.
+  const manifest = realManifest(MEASURED_ARGS);
+  const summary = evidenceSummary(manifest, 'mutation-smoke');
+  assert.match(summary, /in package not measured \(/);
+  assert.match(summary, /survived 4/);
+});
+
+test('evidence summary uses no severity language, measured or not', () => {
+  for (const args of [MEASURED_ARGS, ['--gates-log', '/nonexistent/gates.log']]) {
+    const manifest = realManifest(args);
+    for (const gate of GATES) {
+      const lowered = evidenceSummary(manifest, gate).toLowerCase();
+      for (const term of FORBIDDEN_SUMMARY_TERMS) {
+        assert.ok(!lowered.includes(term),
+          `check-run summary for ${gate} says "${term}" — a surviving mutation is an untested invariant and carries no rating`);
+      }
+    }
+  }
+});
+
+test('the reason breakdown goes on the gate it belongs to, and nowhere else', () => {
+  const manifest = realManifest(MEASURED_ARGS);
+  assert.match(evidenceSummary(manifest, 'mutation-smoke'), /test-internal \(enclosing/);
+  for (const gate of ['build', 'digest', 'tests', 'pin']) {
+    assert.ok(!evidenceSummary(manifest, gate).includes('test-internal (enclosing'),
+      `${gate} must not carry the mutation exclusion breakdown`);
+  }
+});
+
+test('a missing evidence bundle costs the client nothing', () => {
+  // The gates are the product; the summary is the record of them. No manifest means
+  // the caller falls back to the log alone — it never means no verdict.
+  assert.equal(evidenceSummary(null, 'build'), null);
+  assert.equal(evidenceSummary({}, 'build'), null);
+  assert.equal(evidenceSummary('not a manifest', 'build'), null);
 });

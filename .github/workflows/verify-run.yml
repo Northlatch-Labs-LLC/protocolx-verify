@@ -19,7 +19,9 @@
 #     long as GitHub keeps the page; an auditor cannot cite one. The bundle is the same
 #     facts as a file, with a reproducible digest over them, and it is built in an
 #     always() step so a run that died half way through still leaves a record saying
-#     which gates never reported.
+#     which gates never reported. The bundle's digest and headline counts also ride in
+#     each check run's summary: an artifact needs Actions access and expires, a check
+#     run is readable by anyone who can see the pull request.
 #   - Pinned Python: the mutation engine's derivation and reporting stages are Python 3
 #     (standard library only). It is pinned for the same reason Sui is — a floating
 #     interpreter changes behaviour without a line of any repository changing — and it is
@@ -169,19 +171,21 @@ jobs:
           bash engine/ci/gates.sh "client/${{ steps.cfg.outputs.package }}" \
             --mutation-limit "$MUTATION_LIMIT" 2>&1 | tee gates.log || true
 
-      - name: Report gate verdicts
-        if: steps.cfg.outputs.found == '1'
-        env:
-          CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
-          CLIENT_REPOSITORY: ${{ inputs.repository }}
-          CHECK_RUNS: ${{ inputs.check_runs }}
-        run: node runner/report-gates.mjs report gates.log
-
       - name: Build the evidence bundle
+        # Built BEFORE the verdicts are posted, because the verdicts now carry the
+        # bundle's digest and counts in their summary — a workflow artifact needs
+        # Actions access and expires; a check run is readable by anyone who can see the
+        # pull request.
+        #
         # always(): a run that died half way through still produces a bundle, and the
         # gates that never reported serialise as null with the reason recorded — never
         # as zero. A bundle that only exists for clean runs is exactly the bundle an
         # auditor cannot rely on.
+        #
+        # `|| echo` for the same reason the writer's own main() always returns 0: this
+        # step records the measurement, and a recorder that can veto the thing it
+        # records is a recorder nobody should trust. If it dies, the verdicts still go
+        # out — without the evidence summary, and saying so.
         if: always() && steps.cfg.outputs.found == '1'
         run: |
           python3 engine/evidence/evidence_bundle.py \
@@ -192,7 +196,16 @@ jobs:
             --gates-log gates.log \
             --mutation-report "client/${{ steps.cfg.outputs.package }}/mutation-report.json" \
             --derive-log derive.log \
-            --mutation-limit "$MUTATION_LIMIT"
+            --mutation-limit "$MUTATION_LIMIT" \
+            || echo "::warning title=PVS evidence bundle::The evidence bundle could not be written. The gate verdicts below are unaffected; they simply carry no digest."
+
+      - name: Report gate verdicts
+        if: steps.cfg.outputs.found == '1'
+        env:
+          CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          CHECK_RUNS: ${{ inputs.check_runs }}
+        run: node runner/report-gates.mjs report gates.log evidence/manifest.json
 
       - name: Upload the evidence bundle
         if: always() && steps.cfg.outputs.found == '1'
@@ -200,7 +213,7 @@ jobs:
         with:
           name: evidence-${{ inputs.head_sha }}
           path: evidence/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
 
       - name: Sweep unfinished check runs

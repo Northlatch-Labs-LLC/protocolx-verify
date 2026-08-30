@@ -81,6 +81,19 @@ else is included: re-running the same commit on the same toolchain reproduces th
 digest, and a change to any verdict, count, toolchain version or to the engine tree
 changes it.
 
+### Where the evidence is visible
+
+The digest, the toolchain, the gate roll-up and the headline counts are written into
+**every check run's summary**, so a reviewer sees them on the pull request with no
+Actions permission and nothing to download. The full bundle stays attached to the
+runner workflow run as the artifact `evidence-<sha>`. The gate battery's log moves to
+the check run's `text`, below the evidence.
+
+The check-run summary is rendered in JavaScript (`evidenceSummary` in
+`worker/src/lib.js`) and the report in Python, so the list of words neither may say
+exists twice. `engine/test/test_evidence_bundle.py` reads the JavaScript mirror and
+fails if the two ever disagree.
+
 Build one locally from a finished gate run:
 
 ```
