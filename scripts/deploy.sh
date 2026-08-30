@@ -32,7 +32,15 @@ UPLOAD=$(curl -sS -X PUT \
   -H "Authorization: Bearer $TOKEN" \
   -F 'metadata={"main_module":"index.js","compatibility_date":"2026-08-01"};type=application/json' \
   -F "index.js=@$HERE/worker/src/index.js;type=application/javascript+module" \
-  -F "lib.js=@$HERE/worker/src/lib.js;type=application/javascript+module")
+  -F "lib.js=@$HERE/worker/src/lib.js;type=application/javascript+module" \
+  -F "ledger.js=@$HERE/worker/src/ledger.js;type=application/javascript+module")
+# Every module index.js imports must be listed above or the deployed worker cannot
+# resolve it and the front door 500s on the first delivery. CI asserts the two lists
+# agree, so a new module cannot be added without this line moving with it.
+#
+# Note what is NOT uploaded: no bindings and no vars at all. The usage ledger therefore
+# records nothing on this path until a KV namespace is bound deliberately — that is the
+# safety, not an oversight.
 echo "$UPLOAD" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);if(!j.success){console.error("upload FAILED:",JSON.stringify(j.errors));process.exit(1)}console.log("upload: OK")})'
 
 echo "── enabling the workers.dev route"

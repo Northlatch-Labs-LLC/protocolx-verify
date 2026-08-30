@@ -38,6 +38,14 @@ jobs:
       - name: Unit tests (crypto, routing, engine-output parsing)
         run: node --test worker/test/lib.test.mjs
 
+      - name: Usage ledger (metering, absence, and the closed door)
+        # The measurement an invoice is written from. These prove, against a real
+        # webhook delivery captured from our own App: an install creates a record, an
+        # uninstall ends it without destroying history, a repository-selection change
+        # is captured, an unrecorded count reads as null-with-a-reason and never as 0,
+        # and /usage serves nobody when its secret is unset.
+        run: node --test worker/test/ledger.test.mjs
+
       - name: Mutation engine unit tests
         run: python3 engine/move-mutate/test/test_movemutate.py
 
@@ -73,8 +81,33 @@ jobs:
         run: |
           node --check worker/src/index.js
           node --check worker/src/lib.js
+          node --check worker/src/ledger.js
+          node --check worker/test/ledger.test.mjs
           node --check runner/mint-token.mjs
           node --check runner/report-gates.mjs
+
+      - name: Every module the worker imports is actually deployed
+        # scripts/deploy.sh uploads an explicit module list to the Cloudflare API. A new
+        # module in worker/src that nobody adds to that list resolves fine in tests and
+        # 500s on the first real delivery, in production, at the front door. This is the
+        # tripwire.
+        run: |
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("worker/src/index.js", "utf8");
+            const deploy = fs.readFileSync("scripts/deploy.sh", "utf8");
+            const imported = [...src.matchAll(/from\s+["\x27]\.\/([A-Za-z0-9_.-]+)["\x27]/g)].map((m) => m[1]);
+            let bad = 0;
+            for (const f of new Set(["index.js", ...imported])) {
+              if (deploy.includes(f + "=@$HERE/worker/src/" + f)) {
+                console.log("deploy.sh uploads " + f + ": OK");
+              } else {
+                console.error("deploy.sh does NOT upload worker/src/" + f + " — the deployed worker could not resolve it");
+                bad = 1;
+              }
+            }
+            process.exit(bad);
+          '
 
       - name: Engine copies match their recorded hashes
         run: sha256sum -c engine/CHECKSUMS

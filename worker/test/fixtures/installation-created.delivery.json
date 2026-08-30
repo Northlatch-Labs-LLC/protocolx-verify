@@ -1,0 +1,112 @@
+{
+  "_source": "Verbatim GitHub delivery, read from GET /app/hook/deliveries/3839617469538902016 with an App JWT on 2026-08-30. This is the real installation/created event our own App received when it was installed on Northlatch-Labs-LLC/weir. Nothing here is hand-written.",
+  "guid": "ad355eb0-a33b-11f1-956d-c155fa8a5c48",
+  "event": "installation",
+  "action": "created",
+  "delivered_at": "2026-08-28T23:53:33.676Z",
+  "headers": {
+    "Accept": "*/*",
+    "Content-Type": "application/json",
+    "User-Agent": "GitHub-Hookshot/c9c10fd",
+    "X-Github-Delivery": "ad355eb0-a33b-11f1-956d-c155fa8a5c48",
+    "X-Github-Event": "installation",
+    "X-Github-Hook-Id": "671675450",
+    "X-Github-Hook-Installation-Target-Id": "4755965",
+    "X-Github-Hook-Installation-Target-Type": "integration",
+    "X-Hub-Signature": "sha1=55fc30fc9fe9e8e60c880a25097d4fa15c3e6ca8",
+    "X-Hub-Signature-256": "sha256=60ab638f58fb60d9d1536e5631bddf8149b868fd2a25b88af279d113406dcdbf"
+  },
+  "payload": {
+    "action": "created",
+    "installation": {
+      "id": 157375258,
+      "client_id": "Iv23lirVb22G14B6DokX",
+      "account": {
+        "login": "Northlatch-Labs-LLC",
+        "id": 321117593,
+        "node_id": "O_kgDOEyPdmQ",
+        "avatar_url": "https://avatars.githubusercontent.com/u/321117593?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/Northlatch-Labs-LLC",
+        "html_url": "https://github.com/Northlatch-Labs-LLC",
+        "followers_url": "https://api.github.com/users/Northlatch-Labs-LLC/followers",
+        "following_url": "https://api.github.com/users/Northlatch-Labs-LLC/following{/other_user}",
+        "gists_url": "https://api.github.com/users/Northlatch-Labs-LLC/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/Northlatch-Labs-LLC/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/Northlatch-Labs-LLC/subscriptions",
+        "organizations_url": "https://api.github.com/users/Northlatch-Labs-LLC/orgs",
+        "repos_url": "https://api.github.com/users/Northlatch-Labs-LLC/repos",
+        "events_url": "https://api.github.com/users/Northlatch-Labs-LLC/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/Northlatch-Labs-LLC/received_events",
+        "type": "Organization",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "repository_selection": "selected",
+      "access_tokens_url": "https://api.github.com/app/installations/157375258/access_tokens",
+      "repositories_url": "https://api.github.com/installation/repositories",
+      "html_url": "https://github.com/organizations/Northlatch-Labs-LLC/settings/installations/157375258",
+      "app_id": 4755965,
+      "app_slug": "protocolx-verify",
+      "target_id": 321117593,
+      "target_type": "Organization",
+      "permissions": {
+        "checks": "write",
+        "codespaces_metadata": "read",
+        "contents": "read",
+        "deployments": "read",
+        "metadata": "read",
+        "pull_requests": "read",
+        "secret_scanning_alerts": "read",
+        "security_events": "read"
+      },
+      "events": [
+        "check_suite",
+        "deployment",
+        "deployment_review",
+        "deployment_status",
+        "dismissal_request_code_scanning",
+        "pull_request",
+        "pull_request_review"
+      ],
+      "created_at": "2026-08-28T16:53:32.000-07:00",
+      "updated_at": "2026-08-28T16:53:32.000-07:00",
+      "single_file_name": null,
+      "has_multiple_single_files": false,
+      "single_file_paths": [],
+      "suspended_by": null,
+      "suspended_at": null
+    },
+    "repositories": [
+      {
+        "id": 1343161881,
+        "node_id": "R_kgDOUA8GGQ",
+        "name": "weir",
+        "full_name": "Northlatch-Labs-LLC/weir",
+        "private": true
+      }
+    ],
+    "requester": null,
+    "sender": {
+      "login": "0xda7",
+      "id": 315567363,
+      "node_id": "U_kgDOEs8tAw",
+      "avatar_url": "https://avatars.githubusercontent.com/u/315567363?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/0xda7",
+      "html_url": "https://github.com/0xda7",
+      "followers_url": "https://api.github.com/users/0xda7/followers",
+      "following_url": "https://api.github.com/users/0xda7/following{/other_user}",
+      "gists_url": "https://api.github.com/users/0xda7/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/0xda7/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/0xda7/subscriptions",
+      "organizations_url": "https://api.github.com/users/0xda7/orgs",
+      "repos_url": "https://api.github.com/users/0xda7/repos",
+      "events_url": "https://api.github.com/users/0xda7/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/0xda7/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    }
+  }
+}
