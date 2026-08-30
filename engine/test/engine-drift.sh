@@ -26,7 +26,7 @@ echo "=== engine drift gate ==="
 # ---- 1. provenance exists and is machine-readable -------------------------
 if [[ ! -f "$PROV" ]]; then
   fail "no $PROV — the shipped engine cannot prove where it came from."
-  echo "  Run verification-tools/sync-engine.sh <this-repo> to produce it."
+  echo "  Run the canonical repository's sync-engine.sh against this repo to produce it."
   exit 1
 fi
 SRC_COMMIT="$(awk '/^source_commit:/{print $2}' "$PROV")"
@@ -76,6 +76,6 @@ if [[ $FAIL -eq 0 ]]; then
   exit 0
 fi
 echo "DRIFT DETECTED. The shipped engine is not the engine it claims to be."
-echo "Fix at source: edit verification-tools (canonical), then re-run its sync-engine.sh."
+echo "Fix at source: edit the canonical repository, then re-run its sync-engine.sh."
 echo "Never hand-edit engine/ in this repository."
 exit 1

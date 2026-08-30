@@ -20,7 +20,12 @@ import operators
 import shadow as shadowlib
 
 TOOL_VERSION = "0.2.0"
-TOOL_URI = "https://github.com/Northlatch-Labs-LLC/verification-tools"
+# The URL GitHub renders in a client's code-scanning tab, from SARIF
+# `tool.driver.informationUri`. It must point at the PUBLIC action repository:
+# this string reaches every client's security tab, and a link to a private
+# repository shows them a 404 while advertising that the private repository
+# exists.
+TOOL_URI = "https://github.com/Northlatch-Labs-LLC/protocolx-verify"
 
 INDEPENDENCE_CLAUSE = (
     "This is an internal review by the party that wrote the code. It is evidence, "
