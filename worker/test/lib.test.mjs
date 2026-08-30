@@ -20,6 +20,7 @@ import {
   routeEvent,
   parseGatesOutput,
   evidenceSummary,
+  sweepPlan,
   timingSafeEqual,
   FORBIDDEN_SUMMARY_TERMS,
   GATES,
@@ -233,4 +234,73 @@ test('a missing evidence bundle costs the client nothing', () => {
   assert.equal(evidenceSummary(null, 'build'), null);
   assert.equal(evidenceSummary({}, 'build'), null);
   assert.equal(evidenceSummary('not a manifest', 'build'), null);
+});
+
+// --- the sweep must never conflate two different facts ------------------------
+//
+// "We measured this and could not tell you" and "this never ran" look identical on a
+// check run and mean opposite things about a client's code. The sweep is the only
+// place the two can be confused, so it is the only place that needs to be certain.
+
+const MEASURED_LOG = [
+  '── gate: build',
+  '   build: PASS',
+  '── gate: digest — skipped (no ci-expected-digest; not a deployed package)',
+  '── gate: tests',
+  '   tests: FAIL',
+  '── gate: pin — skipped (no check-framework-pin.sh)',
+  '',
+  'GATES FAILED',
+].join('\n');
+
+test('a gate that ran keeps its measured verdict when delivery failed', () => {
+  // build passed and tests failed; both check runs are still open because the posting
+  // call did not land. The sweep must re-post what was measured, not erase it.
+  const plan = sweepPlan(MEASURED_LOG, ['build', 'tests', 'digest']);
+
+  assert.equal(plan.build.kind, 'measured');
+  assert.equal(plan.build.conclusion, 'success');
+  assert.match(plan.build.note, /Measured, then not delivered/);
+  assert.ok(!/never ran/i.test(plan.build.note),
+    'a measured gate must never be described as one that never ran');
+
+  assert.equal(plan.tests.kind, 'measured');
+  assert.equal(plan.tests.conclusion, 'failure');
+
+  // A skipped gate is also a measurement — the engine looked and found no digest file.
+  assert.equal(plan.digest.kind, 'measured');
+  assert.equal(plan.digest.conclusion, 'neutral');
+  assert.match(plan.digest.title, /no ci-expected-digest/);
+});
+
+test('a gate that never ran is still failed loudly, and says why', () => {
+  // mutation-smoke is absent from the log entirely: the engine never reached it.
+  const plan = sweepPlan(MEASURED_LOG, ['mutation-smoke']);
+  assert.equal(plan['mutation-smoke'].kind, 'never-ran');
+  assert.equal(plan['mutation-smoke'].conclusion, 'failure');
+  assert.equal(plan['mutation-smoke'].title, 'gate never reported');
+  assert.match(plan['mutation-smoke'].note, /nothing was measured/);
+});
+
+test('the never-ran verdict never says anything about the client\'s code', () => {
+  const plan = sweepPlan('', GATES);
+  for (const gate of GATES) {
+    assert.equal(plan[gate].kind, 'never-ran');
+    assert.match(plan[gate].note, /This is not a statement about your code/);
+  }
+});
+
+test('with no log at all, every unfinished gate is never-ran and none is invented', () => {
+  // No log means no evidence anything ran. Guessing a verdict here would be inventing
+  // a measurement, which is the one thing worse than admitting we have none.
+  const plan = sweepPlan('', ['build', 'tests']);
+  assert.equal(plan.build.kind, 'never-ran');
+  assert.equal(plan.tests.kind, 'never-ran');
+  assert.equal(Object.keys(plan).length, 2, 'the sweep plans only the gates it was given');
+});
+
+test('the sweep plans nothing for gates that already completed', () => {
+  // Only unfinished gates are passed in; a completed gate must not be touched, because
+  // re-posting it could overwrite a delivered verdict with a stale one.
+  assert.deepEqual(sweepPlan(MEASURED_LOG, []), {});
 });

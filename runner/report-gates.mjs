@@ -3,24 +3,45 @@
 //
 // Turns the engine's output into GitHub check-run verdicts on the client's commit.
 //
+// THE MEASUREMENT IS THE PRODUCT; REPORTING IS HOW WE HAND IT OVER. Nothing in this
+// file may be able to stop a measurement, and nothing in this file may erase one.
+// Two rules follow, and both are load-bearing:
+//
+//   1. `start` is decoration. Flipping five rows from queued to in_progress tells the
+//      client we are alive. It is not evidence of anything, and a GitHub outage during
+//      it must not cost the client their gates. It therefore never throws and always
+//      exits 0; the workflow additionally runs it `continue-on-error`.
+//   2. `sweep` must not conflate "measured, could not deliver" with "never ran". A
+//      gate whose verdict is in the engine's log HAS a verdict. Overwriting it with
+//      "gate never reported" would destroy a real measurement and tell the client
+//      their code was never checked when it was. sweepPlan() in worker/src/lib.js
+//      makes that distinction and is unit-tested on both branches.
+//
 // Modes:
-//   start                  — flip every check run to in_progress (the runner is alive)
+//   start                  — flip every check run to in_progress (best effort, never
+//                            fatal: this is a liveness signal, not a measurement)
 //   report <gates.log> [manifest.json]
 //                          — parse the engine's log; complete each gate that reported.
 //                            When the evidence manifest is given, its digest and counts
 //                            ride in the check-run summary: a workflow artifact needs
 //                            Actions access and expires, but a check run is readable by
 //                            anyone who can see the pull request, forever.
+//                            Every gate is attempted even after one fails, so a single
+//                            bad call cannot cost the client the other four verdicts.
+//                            Exits non-zero if any post failed — "measured, could not
+//                            report" is a loud failure of our service, and the evidence
+//                            bundle is still written and uploaded regardless.
 //   setup-needed           — client repo has no config; complete all gates neutral with
 //                            the setup instructions (a fresh install must not fail red)
-//   sweep                  — complete anything still unfinished as failure ("never ran
-//                            must not read as passed"); runs in an always() step
+//   sweep [gates.log]      — complete anything still unfinished: with the measured
+//                            verdict where one exists, and only otherwise as the
+//                            never-ran failure. Runs in an always() step and exits 0.
 //
 // Env: CLIENT_TOKEN (installation token), CLIENT_REPOSITORY (owner/repo),
 //      CHECK_RUNS (JSON map gate → check-run id).
 
-import { readFileSync } from 'node:fs';
-import { parseGatesOutput, evidenceSummary, GATES } from '../worker/src/lib.js';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { parseGatesOutput, evidenceSummary, sweepPlan, GATES } from '../worker/src/lib.js';
 
 const token = process.env.CLIENT_TOKEN;
 const repository = process.env.CLIENT_REPOSITORY;
@@ -28,7 +49,7 @@ const checkRunsJson = process.env.CHECK_RUNS;
 const mode = process.argv[2];
 
 if (!mode || !['start', 'report', 'setup-needed', 'sweep'].includes(mode)) {
-  console.error('usage: report-gates.mjs start|report <gates.log> [manifest.json]|setup-needed|sweep');
+  console.error('usage: report-gates.mjs start|report <gates.log> [manifest.json]|setup-needed|sweep [gates.log]');
   process.exit(2);
 }
 for (const [name, value] of [
@@ -74,11 +95,42 @@ const SETUP_TEXT = [
   'where `package` is the directory containing your Move.toml. The next push runs the gates.',
 ].join('\n');
 
-if (mode === 'start') {
-  for (const gate of GATES) {
-    await ghCheckRun(checkRuns[gate], 'PATCH', { status: 'in_progress' });
+// "Measured, could not report" — the phrase the workflow log and the job summary must
+// both carry, because it is the one state a reader could otherwise mistake for "not
+// measured". Written to $GITHUB_STEP_SUMMARY when Actions gives us one.
+function noteUndelivered(lines) {
+  const body = ['### PVS — measured, could not report', '', ...lines, ''].join('\n');
+  console.error(body);
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath) {
+    try {
+      appendFileSync(summaryPath, `${body}\n`);
+    } catch (cause) {
+      console.error(`report-gates: could not write the job summary — ${cause.message}`);
+    }
   }
-  console.log('report-gates: all gates marked in_progress');
+}
+
+if (mode === 'start') {
+  // Best effort by design. A failure here is logged and swallowed: the client's
+  // measurement must not depend on our ability to colour five rows yellow.
+  const failed = [];
+  for (const gate of GATES) {
+    try {
+      await ghCheckRun(checkRuns[gate], 'PATCH', { status: 'in_progress' });
+    } catch (cause) {
+      failed.push(`${gate}: ${cause.message}`);
+    }
+  }
+  if (failed.length === 0) {
+    console.log('report-gates: all gates marked in_progress');
+  } else {
+    console.error(
+      `report-gates: ${failed.length} of ${GATES.length} gates could not be marked in_progress. `
+      + 'This is a liveness signal only — the gates still run and the verdicts are still '
+      + 'posted at the end.\n  ' + failed.join('\n  '),
+    );
+  }
 } else if (mode === 'setup-needed') {
   for (const gate of GATES) {
     await ghCheckRun(checkRuns[gate], 'PATCH', {
@@ -115,34 +167,97 @@ if (mode === 'start') {
   // `summary`, above it, because that is the half GitHub renders first and the half a
   // reviewer without Actions access has no other way to reach.
   const tail = log.length > 6000 ? `…\n${log.slice(-6000)}` : log;
+  // Every gate is attempted even after one fails. Throwing on the first bad call would
+  // let a single 422 on one check run cost the client the other four verdicts, which
+  // are already measured and sitting in the log.
+  const undelivered = [];
   for (const gate of GATES) {
     const result = results[gate];
-    if (!result) continue; // silence is handled by sweep, loudly
+    if (!result) continue; // silence is handled by sweep, which distinguishes it
     const evidence = evidenceSummary(manifest, gate);
-    await ghCheckRun(checkRuns[gate], 'PATCH', {
-      status: 'completed',
-      conclusion: result.conclusion,
-      output: {
-        title: result.note.slice(0, 120) || result.conclusion,
-        summary: evidence ?? `\`\`\`\n${tail}\n\`\`\``,
-        ...(evidence ? { text: `\`\`\`\n${tail}\n\`\`\`` } : {}),
-      },
-    });
-    console.log(`report-gates: ${gate} → ${result.conclusion}${evidence ? ' (with evidence)' : ''}`);
-  }
-} else if (mode === 'sweep') {
-  for (const gate of GATES) {
-    const current = await ghCheckRun(checkRuns[gate], 'GET');
-    if (current.status !== 'completed') {
+    try {
       await ghCheckRun(checkRuns[gate], 'PATCH', {
         status: 'completed',
-        conclusion: 'failure',
+        conclusion: result.conclusion,
         output: {
-          title: 'gate never reported',
-          summary: 'The runner ended without a verdict for this gate — it died or the gate never ran. The runner workflow log has the story.',
+          title: result.note.slice(0, 120) || result.conclusion,
+          summary: evidence ?? `\`\`\`\n${tail}\n\`\`\``,
+          ...(evidence ? { text: `\`\`\`\n${tail}\n\`\`\`` } : {}),
         },
       });
-      console.log(`report-gates: ${gate} swept → failure`);
+      console.log(`report-gates: ${gate} → ${result.conclusion}${evidence ? ' (with evidence)' : ''}`);
+    } catch (cause) {
+      undelivered.push(`\`${gate}\` measured **${result.conclusion}** — ${cause.message}`);
     }
   }
+  if (undelivered.length > 0) {
+    noteUndelivered([
+      'These gates ran and produced a verdict. The call that should have posted it to '
+      + 'GitHub failed. The verdicts below are real measurements, and the evidence bundle '
+      + 'attached to this run contains them in full:',
+      '',
+      ...undelivered.map((line) => `- ${line}`),
+      '',
+      'The sweep step will retry them with their measured verdicts.',
+    ]);
+    // Loud: this is a failure of our delivery, not of the client's code. The evidence
+    // bundle is still written and still uploaded — those steps are always().
+    process.exitCode = 1;
+  }
+} else if (mode === 'sweep') {
+  // The sweep reads the engine's log before it writes anything, so that a gate we
+  // MEASURED but failed to deliver is retried with its real verdict instead of being
+  // overwritten with "never ran". Destroying a measurement to tidy up a yellow row
+  // would be the worst thing this file could do.
+  const logPath = process.argv[3];
+  let log = '';
+  if (logPath) {
+    try {
+      log = readFileSync(logPath, 'utf8');
+    } catch {
+      // No log means nothing was measured, and every unfinished gate is genuinely
+      // never-ran. That is the honest reading, so it needs no special case.
+    }
+  }
+
+  const unfinished = [];
+  for (const gate of GATES) {
+    try {
+      const current = await ghCheckRun(checkRuns[gate], 'GET');
+      if (current.status !== 'completed') unfinished.push(gate);
+    } catch (cause) {
+      console.error(`report-gates: could not read ${gate}'s check run — ${cause.message}`);
+    }
+  }
+
+  const plan = sweepPlan(log, unfinished);
+  const stillUndelivered = [];
+  for (const gate of unfinished) {
+    const step = plan[gate];
+    try {
+      await ghCheckRun(checkRuns[gate], 'PATCH', {
+        status: 'completed',
+        conclusion: step.conclusion,
+        output: { title: step.title, summary: step.note },
+      });
+      console.log(`report-gates: ${gate} swept → ${step.conclusion} (${step.kind})`);
+    } catch (cause) {
+      if (step.kind === 'measured') {
+        stillUndelivered.push(`\`${gate}\` measured **${step.conclusion}** — ${cause.message}`);
+      } else {
+        console.error(`report-gates: ${gate} could not be swept — ${cause.message}`);
+      }
+    }
+  }
+  if (stillUndelivered.length > 0) {
+    noteUndelivered([
+      'These gates ran and produced a verdict, and GitHub would not accept it on either '
+      + 'attempt. The check runs on the commit do not show these results. The evidence '
+      + 'bundle attached to this run does:',
+      '',
+      ...stillUndelivered.map((line) => `- ${line}`),
+    ]);
+  }
+  // Always 0. The sweep is the safety net that runs in an always() step; making it red
+  // would bury whatever actually went wrong underneath it.
 }

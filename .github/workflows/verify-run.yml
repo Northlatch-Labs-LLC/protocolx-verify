@@ -9,6 +9,13 @@
 # writes each gate's verdict back onto the client's commit as a completed check run.
 #
 # Discipline carried over from the estate's own CI:
+#   - THE MEASUREMENT IS THE PRODUCT; REPORTING IS HOW WE HAND IT OVER. The gates are
+#     conditioned on the things measuring actually needs — the client's code, sui,
+#     python3, a self-tested engine — and on nothing about GitHub's check-run API. A
+#     failure to colour five rows yellow costs the client a colour, never a measurement.
+#     And a verdict that was measured but could not be delivered is retried with its
+#     real value, never overwritten with "gate never reported": destroying a
+#     measurement to tidy up a yellow row is the worst thing this runner could do.
 #   - Pinned toolchain: a floating Sui version changes what compiles — and what digest
 #     the source builds to — without a line of any repository changing.
 #   - The gates step never hard-fails the job: verdicts are read from the engine's own
@@ -142,8 +149,30 @@ jobs:
             exit 1
           fi
 
-      - name: Mark gates in progress
+      # ---------------------------------------------------------------------------
+      # THE PRECONDITION LINE. Everything above this point is something the
+      # MEASUREMENT genuinely needs: the client's code fetched at the exact commit, a
+      # pinned sui, a pinned python3, and an engine that passed its own self-test. If
+      # any of those failed, measuring is impossible and the bundle will say so.
+      #
+      # Everything below is either the measurement itself or the delivery of it, and
+      # DELIVERY MUST NEVER BE A PRECONDITION OF MEASUREMENT. Marking five check runs
+      # yellow is delivery. It used to sit in the ordinary success chain, so a single
+      # GitHub API hiccup skipped the gates entirely and the client lost the whole
+      # measurement rather than merely its display. That is backwards: the measurement
+      # is the product.
+      # ---------------------------------------------------------------------------
+      - name: Preconditions met
+        id: ready
         if: steps.cfg.outputs.found == '1'
+        run: echo "ready=1" >> "$GITHUB_OUTPUT"
+
+      - name: Mark gates in progress
+        # continue-on-error: this is a liveness signal, not evidence. The script already
+        # swallows per-gate failures; this is the second belt, so that no future edit to
+        # the script can make a yellow row a precondition of a measurement.
+        if: steps.ready.outputs.ready == '1'
+        continue-on-error: true
         env:
           CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
@@ -151,7 +180,9 @@ jobs:
         run: node runner/report-gates.mjs start
 
       - name: Derive the full mutation set for the evidence bundle
-        if: steps.cfg.outputs.found == '1'
+        # always() && ready: runs on the preconditions being met, never on whether the
+        # check runs were successfully coloured in.
+        if: always() && steps.ready.outputs.ready == '1'
         run: |
           # `--list` derives and exits before the baseline, so this needs python3 but
           # not sui and costs seconds. It answers a question the smoke gate cannot:
@@ -164,7 +195,10 @@ jobs:
             > derive.log 2>&1 || true
 
       - name: Run the gates
-        if: steps.cfg.outputs.found == '1'
+        # THE MEASUREMENT. Conditioned on the preconditions and on nothing else — not on
+        # the marking step, not on the derivation step above it. If either of those
+        # failed, the client still gets measured.
+        if: always() && steps.ready.outputs.ready == '1'
         run: |
           # The engine's exit code is deliberately not this step's: verdicts come from its
           # output, per gate, and the sweep step turns any silence into an explicit failure.
@@ -200,7 +234,11 @@ jobs:
             || echo "::warning title=PVS evidence bundle::The evidence bundle could not be written. The gate verdicts below are unaffected; they simply carry no digest."
 
       - name: Report gate verdicts
-        if: steps.cfg.outputs.found == '1'
+        # always(): delivery is attempted whatever happened upstream. It exits non-zero
+        # if any verdict could not be posted — "measured, could not report" is a loud
+        # failure of our service — and the upload below is always(), so the bundle
+        # carrying those same verdicts survives the failure.
+        if: always() && steps.cfg.outputs.found == '1'
         env:
           CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
@@ -217,9 +255,13 @@ jobs:
           retention-days: 90
 
       - name: Sweep unfinished check runs
+        # Handed the gates log on purpose. Without it the sweep would mark every
+        # unfinished row "gate never reported" — including gates that RAN and whose
+        # verdict simply failed to post, which would destroy a real measurement and tell
+        # the client their code was never checked when it was.
         if: always()
         env:
           CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
           CHECK_RUNS: ${{ inputs.check_runs }}
-        run: node runner/report-gates.mjs sweep
+        run: node runner/report-gates.mjs sweep gates.log
