@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\
-# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
 """
 derive — build the mutation set for a package, deterministically.
 
@@ -31,6 +30,7 @@ import sys
 
 import movelex
 import operators
+import shadow
 
 
 def iter_sources(pkg, filter_sub=""):
@@ -287,7 +287,10 @@ def main(argv):
     else:
         muts, skipped, excluded = derive_parsed(pkg, files, classes)
 
-    muts = finalize(preclassify(muts, pkg))
+    # Shadow triage is attached AFTER the set is fixed and BEFORE the hash is
+    # taken, which is safe precisely because set_hash() reads only the edit
+    # identity fields — annotating cannot move a published number.
+    muts = finalize(shadow.annotate(pkg, preclassify(muts, pkg)))
     truncated = 0
     if args.limit > 0 and len(muts) > args.limit:
         truncated = len(muts) - args.limit

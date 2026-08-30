@@ -112,6 +112,16 @@ jobs:
         # compile failure — but only once the output is large enough to race.
         run: bash engine/test/classify.sh
 
+      - name: The shipped engine is the engine it claims to be
+        # The defect this guards, found 2026-08-30: the shipped engine was missing
+        # lib/shadow.py entirely and its loader never named it, hours after a sync
+        # from canonical. The App therefore ran a measurably different engine from
+        # the one the desk runs in-house, and neither copy was authoritative. That is
+        # exactly what our own digest gate sells against — the thing that runs is not
+        # the thing in the repository. Checks provenance, per-file hashes, and that
+        # the module loader agrees with the modules actually shipped.
+        run: bash engine/test/engine-drift.sh
+
       - name: The shipped engine measures a nested package
         # The defect this guards: a flat `sources/*.move` glob derives ZERO mutations
         # from any package that nests its modules, so our own product reports

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\
-# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
 """
 report — emit the run in Markdown, JSON and SARIF from one manifest.
 
@@ -18,9 +17,10 @@ import os
 import sys
 
 import operators
+import shadow as shadowlib
 
 TOOL_VERSION = "0.2.0"
-TOOL_URI = "https://github.com/Northlatch-Labs-LLC/protocolx-verify"
+TOOL_URI = "https://github.com/Northlatch-Labs-LLC/verification-tools"
 
 INDEPENDENCE_CLAUSE = (
     "This is an internal review by the party that wrote the code. It is evidence, "
@@ -30,6 +30,15 @@ INDEPENDENCE_CLAUSE = (
 SURVIVOR_MEANING = (
     "A surviving mutant names an invariant that no test exercises. It is not, by "
     "itself, an exploit or a finding of vulnerability."
+)
+
+# Printed wherever a clean-looking number could be mistaken for proof of a sound
+# suite. A static score cannot see an oracle pinned to the WRONG constant.
+STATIC_SCORE_CAVEAT = (
+    "A suite that scores well on any static measure is not thereby sound. An "
+    "`#[expected_failure(abort_code = …)]` pinned to the WRONG constant looks "
+    "precise to every grep and still fails to test what it names; only running "
+    "the mutation can tell. Treat static counts as triage, never as assurance."
 )
 
 # The only levels this tool will ever emit. "error" is absent on purpose.
@@ -194,9 +203,38 @@ def build_markdown(manifest, results, skipped, excluded):
           "untestable / defensive no-op). Proposals below are evidence for that "
           "decision, not the decision.")
         a("")
+        counts = shadowlib.summarize(survivors)
+        if any(counts.get(k) for k in (shadowlib.NO_FALLBACK, shadowlib.CORRELATED,
+                                       shadowlib.PRESENT, shadowlib.UNKNOWN)):
+            a("### Shadow triage")
+            a("")
+            a(shadowlib.LABEL_MEANING)
+            a("")
+            a("| behind the guard | survivors | what it means for testing this guard |")
+            a("|---|---|---|")
+            a("| `%s` | %d | nothing after the guard can abort, so deleting it makes "
+              "the call return normally — any test that reaches this path at all "
+              "would notice. Cheapest gaps to close. |"
+              % (shadowlib.NO_FALLBACK, counts.get(shadowlib.NO_FALLBACK, 0)))
+            a("| `%s` | %d | something after the guard can abort AND involves the "
+              "same values the guard tests — a bare `#[expected_failure]` here can "
+              "pass without testing anything; it needs `abort_code = …`. |"
+              % (shadowlib.CORRELATED, counts.get(shadowlib.CORRELATED, 0)))
+            a("| `%s` | %d | something after the guard can abort, but is not tied to "
+              "the guard's condition. Unproven either way. |"
+              % (shadowlib.PRESENT, counts.get(shadowlib.PRESENT, 0)))
+            a("| `%s` | %d | not determined — calls this analysis does not follow. |"
+              % (shadowlib.UNKNOWN, counts.get(shadowlib.UNKNOWN, 0)))
+            a("")
+            a("*%s*" % STATIC_SCORE_CAVEAT)
+            a("")
         for r in survivors:
             a("- `%s:%d` [%s] `%s`" % (r["file"], r["line"], r["rule_id"],
                                        r.get("original", "").strip()))
+            sh = r.get("shadow") or {}
+            if sh.get("label") and sh["label"] != shadowlib.NOT_APPLICABLE:
+                a("    - *behind the guard:* `%s` — %s" %
+                  (sh["label"], sh.get("evidence", "")))
             for p in r.get("proposals") or []:
                 a("    - *proposed:* %s (%s confidence) — %s" %
                   (p["classification"], p["confidence"], p["evidence"]))
