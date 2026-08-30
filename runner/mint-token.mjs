@@ -7,17 +7,19 @@
 // never appear in a log line.
 
 import { appendFileSync } from 'node:fs';
-import { appJwt } from '../worker/src/lib.js';
+import { appJwt, installationTokenRequest, RUNNER_TOKEN_PERMISSIONS } from '../worker/src/lib.js';
 
 const appId = process.env.GH_APP_ID;
 const privateKeyPem = process.env.GH_APP_PRIVATE_KEY;
 const installationId = process.env.INSTALLATION_ID;
+const repository = process.env.CLIENT_REPOSITORY;
 const outputFile = process.env.GITHUB_OUTPUT;
 
 for (const [name, value] of [
   ['GH_APP_ID', appId],
   ['GH_APP_PRIVATE_KEY', privateKeyPem],
   ['INSTALLATION_ID', installationId],
+  ['CLIENT_REPOSITORY', repository],
   ['GITHUB_OUTPUT', outputFile],
 ]) {
   if (!value) {
@@ -27,6 +29,11 @@ for (const [name, value] of [
 }
 
 const jwt = await appJwt(appId, privateKeyPem);
+// Narrowed on both axes at the moment of minting. An empty body would mint a token
+// carrying every permission the App holds on every repository in the installation; this
+// job fetches ONE repository and writes check runs on it, so that is all it asks for.
+// GitHub enforces the narrowing, so a token stolen out of this job cannot be widened.
+const scope = installationTokenRequest(repository, RUNNER_TOKEN_PERMISSIONS);
 const response = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
   method: 'POST',
   headers: {
@@ -34,7 +41,9 @@ const response = await fetch(`https://api.github.com/app/installations/${install
     authorization: `Bearer ${jwt}`,
     'user-agent': 'protocolx-verify',
     'x-github-api-version': '2022-11-28',
+    'content-type': 'application/json',
   },
+  body: JSON.stringify(scope),
 });
 const body = await response.json().catch(() => ({}));
 if (!response.ok || !body.token) {
@@ -45,4 +54,8 @@ if (!response.ok || !body.token) {
 // Mask FIRST, then write the output — order matters for what the log can ever show.
 console.log(`::add-mask::${body.token}`);
 appendFileSync(outputFile, `token=${body.token}\n`);
-console.log(`mint-token: installation token minted, expires ${body.expires_at}`);
+console.log(
+  `mint-token: installation token minted, expires ${body.expires_at}`
+  + ` — scope: ${(scope.repositories ?? ['<all granted>']).join(',')}`
+  + ` · ${Object.entries(scope.permissions).map(([k, v]) => `${k}:${v}`).join(' ')}`,
+);

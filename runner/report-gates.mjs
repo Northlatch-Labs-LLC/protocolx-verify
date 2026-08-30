@@ -33,9 +33,16 @@
 //                            bundle is still written and uploaded regardless.
 //   setup-needed           — client repo has no config; complete all gates neutral with
 //                            the setup instructions (a fresh install must not fail red)
+//   refuse <notes-file>    — the dependency policy refused this repository; complete all
+//                            gates as failure carrying the reason. A refusal the client
+//                            cannot read is indistinguishable from us being broken.
 //   sweep [gates.log]      — complete anything still unfinished: with the measured
 //                            verdict where one exists, and only otherwise as the
 //                            never-ran failure. Runs in an always() step and exits 0.
+//   revoke                 — hand the installation token back. GitHub mints these with a
+//                            one-hour life and gives us no way to ask for less, so the
+//                            only lever on "how long is a stolen copy useful" is to end
+//                            it ourselves the moment the job is done with it.
 //
 // Env: CLIENT_TOKEN (installation token), CLIENT_REPOSITORY (owner/repo),
 //      CHECK_RUNS (JSON map gate → check-run id).
@@ -48,8 +55,11 @@ const repository = process.env.CLIENT_REPOSITORY;
 const checkRunsJson = process.env.CHECK_RUNS;
 const mode = process.argv[2];
 
-if (!mode || !['start', 'report', 'setup-needed', 'sweep'].includes(mode)) {
-  console.error('usage: report-gates.mjs start|report <gates.log> [manifest.json]|setup-needed|sweep [gates.log]');
+if (!mode || !['start', 'report', 'setup-needed', 'sweep', 'refuse', 'revoke'].includes(mode)) {
+  console.error(
+    'usage: report-gates.mjs start|report <gates.log> [manifest.json]'
+    + '|setup-needed|refuse <notes>|sweep [gates.log]|revoke',
+  );
   process.exit(2);
 }
 for (const [name, value] of [
@@ -59,9 +69,10 @@ for (const [name, value] of [
 ]) {
   if (!value) {
     console.error(`report-gates: missing ${name}`);
-    // sweep runs in an always() step: when the token was never minted there is nothing
-    // to sweep WITH — exit clean so the workflow's real failure stays the visible one.
-    process.exit(mode === 'sweep' ? 0 : 2);
+    // sweep and revoke run in always() steps: when the token was never minted there is
+    // nothing to sweep or revoke WITH — exit clean so the workflow's real failure stays
+    // the visible one.
+    process.exit(mode === 'sweep' || mode === 'revoke' ? 0 : 2);
   }
 }
 const checkRuns = JSON.parse(checkRunsJson);
@@ -140,6 +151,45 @@ if (mode === 'start') {
     });
   }
   console.log('report-gates: setup instructions posted on all gates');
+} else if (mode === 'revoke') {
+  const response = await fetch('https://api.github.com/installation/token', {
+    method: 'DELETE',
+    headers: {
+      accept: 'application/vnd.github+json',
+      authorization: `Bearer ${token}`,
+      'user-agent': 'protocolx-verify',
+      'x-github-api-version': '2022-11-28',
+    },
+  });
+  // 204 is success. Anything else is worth saying out loud — an un-revoked token is a
+  // live credential for up to an hour — but it must not fail the run, because failing
+  // here would be a red check run on a client whose gates were fine.
+  if (response.status === 204) {
+    console.log('report-gates: installation token revoked');
+  } else {
+    console.log(`report-gates: token revocation answered ${response.status} — it will expire on GitHub's own clock instead`);
+  }
+} else if (mode === 'refuse') {
+  const notesPath = process.argv[3];
+  if (!notesPath) {
+    console.error('refuse mode needs the notes file path');
+    process.exit(2);
+  }
+  const notes = readFileSync(notesPath, 'utf8');
+  const summary = [
+    'ProtocolX Verify did not run the gates on this commit. Its dependency policy refused',
+    'the package before anything was fetched, compiled or executed.',
+    '',
+    notes,
+  ].join('\n');
+  for (const gate of GATES) {
+    await ghCheckRun(checkRuns[gate], 'PATCH', {
+      status: 'completed',
+      conclusion: 'failure',
+      output: { title: 'dependency policy refused this package', summary: summary.slice(0, 65000) },
+    });
+  }
+  console.log('report-gates: dependency refusal posted on all gates');
 } else if (mode === 'report') {
   const logPath = process.argv[3];
   if (!logPath) {

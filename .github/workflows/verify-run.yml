@@ -1,4 +1,4 @@
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui /|\ · Co-authored-by: Kaela
 #
 # The runner — the muscle behind the ProtocolX Verify GitHub App.
 #
@@ -7,6 +7,48 @@
 # with a short-lived installation token, runs the estate's gate engine verbatim
 # (engine/ci/gates.sh — build, digest guard, tests, framework pin, mutation smoke), and
 # writes each gate's verdict back onto the client's commit as a completed check run.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# KEY DISTANCE — why this file is shaped the way it is
+#
+# Once the App is installable by anyone, the repository this job fetches is written by a
+# stranger, and running it is the product. `sui move test` executes the client's Move
+# bytecode; `sui move build` fetches and compiles the client's declared dependencies;
+# and gates.sh honours the client's own `scripts/check-framework-pin.sh`, which is
+# arbitrary shell. In the same job we hold a GitHub App installation token — and, in one
+# step, the App private key itself.
+#
+# The rule this workflow enforces: THE STEPS THAT HOLD CREDENTIALS AND THE STEPS THAT
+# EXECUTE CLIENT CODE ARE DISJOINT SETS. Concretely —
+#
+#   · Credentialed steps (mint, fetch, start, refuse, report, sweep) run our code only,
+#     from a copy staged outside the workspace before the client's repository exists.
+#   · Client-executing steps run through runner/sandbox.sh: an `env -i` allowlist under a
+#     dedicated unprivileged uid, in a staged tree that holds nothing of ours.
+#   · The token never enters a remote URL, so it never lands in .git/config; the client
+#     checkout stops being a git repository before it is staged.
+#   · No client-controlled value is ever interpolated into a shell with `${{ }}`. The
+#     package path is validated against an allowlist first and then passed as an argv
+#     element, never spliced into a command line.
+#   · After the client's code has run, every file under runner/, worker/ and engine/ is
+#     re-hashed. If one moved, the run fails loudly instead of reporting a verdict.
+#
+# ORTHOGONAL TO, AND PRESERVED ALONGSIDE, MEASUREMENT RESILIENCE. Secret distance is
+# about WHO can read a credential; measurement resilience is about whether a delivery
+# failure can destroy a measurement. They never trade against each other, and any change
+# here that appears to make them trade is wrong. Concretely: marking check runs in
+# progress is continue-on-error, so a GitHub API hiccup costs a colour and never a gate;
+# the evidence bundle is written and uploaded in always() steps. The single case where a
+# verdict is deliberately withheld is a tripped tamper tripwire — not a delivery failure
+# but the absence of any measurement we can vouch for.
+#
+# runner/test/secret-distance.sh proves those properties from this file's own text on
+# every pull request, so a future edit that reintroduces a secret into a client-executing
+# step fails CI rather than shipping.
+#
+# What this does NOT contain, so nobody infers it: outbound network egress is not
+# filtered. See "Network and persistence" in README.md.
+# ─────────────────────────────────────────────────────────────────────────────────────
 #
 # Discipline carried over from the estate's own CI:
 #   - THE MEASUREMENT IS THE PRODUCT; REPORTING IS HOW WE HAND IT OVER. The gates are
@@ -70,6 +112,13 @@ env:
   # this number would drift, and a bundle that reported a limit the gates did not
   # apply would misstate how much of the package was actually measured.
   MUTATION_LIMIT: '5'
+  # The uid the client's code runs as. It owns nothing but the staged tree below.
+  PVS_SANDBOX_USER: pvs-sandbox
+  PVS_SANDBOX_ROOT: /srv/pvs
+  # A sandbox that silently degrades is not a sandbox. If the drop cannot be made, the
+  # run fails; it does not fall back to executing a stranger's code as the account that
+  # holds our token.
+  PVS_SANDBOX_REQUIRED: '1'
 
 jobs:
   verify:
@@ -77,6 +126,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # actions/checkout otherwise writes the job's GITHUB_TOKEN into .git/config as
+          # an http.extraheader and leaves it there for the whole run. We never use it
+          # after checkout, so it should not exist after checkout.
+          persist-credentials: false
+
+      - name: Stage the credentialed tooling out of the client's reach
+        id: tooling
+        run: |
+          set -euo pipefail
+          TOOLING="$RUNNER_TEMP/pvs-tooling"
+          rm -rf "$TOOLING"
+          mkdir -p "$TOOLING"
+          cp -R runner worker "$TOOLING/"
+          # Every credentialed step below runs from this copy, not from the workspace.
+          # The workspace is the tree the client's package is compiled beside; the
+          # scripts we hand a token to should not live in it.
+          #
+          # And a tripwire: hash our own files now, before a single client byte exists on
+          # this machine, so "the sandbox held" is something we check rather than assume.
+          # __pycache__ is excluded: our own engine self-test writes .pyc files into the
+          # tree between these two hashes, and a tripwire that cries wolf gets disabled.
+          find runner worker engine -type f -not -path '*/__pycache__/*' -print0 \
+            | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/tooling-before.sha256"
+          echo "tooling staged at $TOOLING · $(wc -l < "$RUNNER_TEMP/tooling-before.sha256") files fingerprinted"
+
+      - name: Validate the dispatch inputs
+        # The quote closes before the filename throughout this file, rather than around
+        # the whole path. That is deliberate: runner/test/wiring.test.mjs addresses these
+        # lines by the literal text `report-gates.mjs <mode>`, and quoting through the
+        # filename hides them from it — a step that a test can no longer see is a step
+        # that is no longer tested. The path stays quoted; only the closing quote moves.
+        env:
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          CHECK_RUNS: ${{ inputs.check_runs }}
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/preflight.mjs inputs
 
       - name: Mint installation token
         id: mint
@@ -84,29 +170,39 @@ jobs:
           GH_APP_ID: ${{ secrets.GH_APP_ID }}
           GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
           INSTALLATION_ID: ${{ inputs.installation_id }}
-        run: node runner/mint-token.mjs
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/mint-token.mjs
 
       - name: Fetch the client repository at the exact commit
         env:
           TOKEN: ${{ steps.mint.outputs.token }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          HEAD_SHA: ${{ inputs.head_sha }}
         run: |
-          git init -q client
-          cd client
-          git remote add origin "https://x-access-token:${TOKEN}@github.com/${{ inputs.repository }}.git"
-          git fetch --depth 1 origin "${{ inputs.head_sha }}"
-          git checkout -q --detach FETCH_HEAD
+          set -euo pipefail
+          CLIENT="$RUNNER_TEMP/client"
+          rm -rf "$CLIENT"
+          git init -q "$CLIENT"
+          git -C "$CLIENT" remote add origin "https://github.com/${CLIENT_REPOSITORY}.git"
+          # The token goes to git through a credential helper, never through the remote
+          # URL. A URL-embedded token is written verbatim into .git/config and stays
+          # there for the rest of the job, inside the very tree we are about to hand to
+          # a stranger's build. $TOKEN below is expanded by the shell git spawns for the
+          # helper, so it is not in any argv either.
+          git -C "$CLIENT" \
+            -c 'credential.helper=' \
+            -c 'credential.helper=!f() { echo username=x-access-token; echo "password=$TOKEN"; }; f' \
+            fetch --depth 1 --no-tags origin "$HEAD_SHA"
+          git -C "$CLIENT" checkout -q --detach FETCH_HEAD
+          # And now it stops being a git repository at all. Nothing downstream needs git
+          # history, and a .git directory is a credential store, a hook directory and a
+          # config file we did not write.
+          rm -rf "$CLIENT/.git"
+          echo "client checked out at $HEAD_SHA · $(find "$CLIENT" -type f | wc -l) files · no .git"
 
-      - name: Read client configuration
+      - name: Read the client configuration
         id: cfg
-        run: |
-          if [ ! -f client/.protocolx-verify.json ]; then
-            echo "found=0" >> "$GITHUB_OUTPUT"
-            echo "No .protocolx-verify.json in the client repository — will post setup instructions."
-          else
-            PKG=$(node -e 'const c = require("./client/.protocolx-verify.json"); if (typeof c.package !== "string" || c.package === "") { console.error("config has no \"package\" string"); process.exit(1); } console.log(c.package)')
-            echo "found=1" >> "$GITHUB_OUTPUT"
-            echo "package=$PKG" >> "$GITHUB_OUTPUT"
-          fi
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/preflight.mjs config "$RUNNER_TEMP/client"
 
       - name: Post setup instructions
         if: steps.cfg.outputs.found == '0'
@@ -114,26 +210,48 @@ jobs:
           CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
           CHECK_RUNS: ${{ inputs.check_runs }}
-        run: node runner/report-gates.mjs setup-needed
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/report-gates.mjs setup-needed
+
+      - name: Apply the dependency policy
+        id: deps
+        if: steps.cfg.outputs.found == '1'
+        env:
+          PKG: ${{ steps.cfg.outputs.package }}
+        run: |
+          node "$RUNNER_TEMP/pvs-tooling/runner"/preflight.mjs deps \
+            "$RUNNER_TEMP/client" "$PKG" "$RUNNER_TEMP/dependency-notes.md"
+
+      - name: Refuse the package and say why
+        if: steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '1'
+        env:
+          CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          CHECK_RUNS: ${{ inputs.check_runs }}
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/report-gates.mjs refuse "$RUNNER_TEMP/dependency-notes.md"
 
       - name: Install Sui CLI (pinned)
-        if: steps.cfg.outputs.found == '1'
+        if: steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '0'
         run: |
-          curl -sSL -o sui.tgz \
+          set -euo pipefail
+          curl -sSL -o "$RUNNER_TEMP/sui.tgz" \
             "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz"
-          mkdir -p "$HOME/.local/bin"
-          tar -xzf sui.tgz -C "$HOME/.local/bin" --strip-components=1 || tar -xzf sui.tgz -C "$HOME/.local/bin"
-          chmod +x "$HOME/.local/bin/sui"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/sui"
+          tar -xzf "$RUNNER_TEMP/sui.tgz" -C "$RUNNER_TEMP/sui"
+          BIN="$(find "$RUNNER_TEMP/sui" -type f -name sui | head -1)"
+          [ -n "$BIN" ] || { echo "::error title=PVS runner::the pinned Sui archive contained no sui binary"; exit 1; }
+          # Installed system-wide rather than into the runner's home: the sandbox uid must
+          # be able to execute it without being able to read /home/runner.
+          sudo install -m 0755 "$BIN" /usr/local/bin/sui
+          sui --version
 
       - name: Install Python (pinned — the mutation engine's derivation stage)
-        if: steps.cfg.outputs.found == '1'
+        if: steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '0'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Verify the mutation engine before touching client code
-        if: steps.cfg.outputs.found == '1'
+        if: steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '0'
         run: |
           if ! command -v python3 >/dev/null 2>&1; then
             echo "::error title=PVS engine unavailable::python3 is required by the ProtocolX Verify mutation engine and is not on PATH. The mutation-smoke gate cannot run. This is a fault in our runner, not in your repository."
@@ -149,11 +267,38 @@ jobs:
             exit 1
           fi
 
+      - name: Build the sandbox the client's code will run in
+        if: steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '0'
+        run: |
+          set -euo pipefail
+          if ! id -u "$PVS_SANDBOX_USER" >/dev/null 2>&1; then
+            sudo useradd --system --user-group --no-create-home --shell /usr/sbin/nologin "$PVS_SANDBOX_USER"
+          fi
+          sudo rm -rf "$PVS_SANDBOX_ROOT"
+          sudo mkdir -p "$PVS_SANDBOX_ROOT"
+          # The sandbox tree holds exactly two things: our engine, and the client's
+          # package. No token, no tooling that carries one, nothing of the workspace.
+          sudo cp -R engine "$PVS_SANDBOX_ROOT/engine"
+          sudo cp -R "$RUNNER_TEMP/client" "$PVS_SANDBOX_ROOT/client"
+          sudo mkdir -p "$PVS_SANDBOX_ROOT/home" "$PVS_SANDBOX_ROOT/tmp"
+          sudo chown -R "$PVS_SANDBOX_USER:$PVS_SANDBOX_USER" "$PVS_SANDBOX_ROOT"
+          sudo chmod 0700 "$PVS_SANDBOX_ROOT"
+          # Close the door the other way too. /home/runner holds the workspace, the
+          # Actions temp directory (with the tooling copy) and the toolchain caches. The
+          # sandbox uid has no business reading any of it; after this it cannot even
+          # traverse the directory.
+          sudo chmod o-rwx /home/runner
+          echo "sandbox: $(id "$PVS_SANDBOX_USER")"
+          sudo ls -ld "$PVS_SANDBOX_ROOT"
+
       # ---------------------------------------------------------------------------
       # THE PRECONDITION LINE. Everything above this point is something the
       # MEASUREMENT genuinely needs: the client's code fetched at the exact commit, a
-      # pinned sui, a pinned python3, and an engine that passed its own self-test. If
-      # any of those failed, measuring is impossible and the bundle will say so.
+      # pinned sui, a pinned python3, an engine that passed its own self-test, and the
+      # sandbox it will all run inside. If any of those failed, measuring is impossible
+      # and the bundle will say so. The sandbox is on this side of the line deliberately:
+      # it is not optional hardening to be skipped when inconvenient, it is a condition
+      # of measuring at all, and a run that cannot build it must not measure anything.
       #
       # Everything below is either the measurement itself or the delivery of it, and
       # DELIVERY MUST NEVER BE A PRECONDITION OF MEASUREMENT. Marking five check runs
@@ -164,7 +309,7 @@ jobs:
       # ---------------------------------------------------------------------------
       - name: Preconditions met
         id: ready
-        if: steps.cfg.outputs.found == '1'
+        if: steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '0'
         run: echo "ready=1" >> "$GITHUB_OUTPUT"
 
       - name: Mark gates in progress
@@ -177,12 +322,14 @@ jobs:
           CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
           CHECK_RUNS: ${{ inputs.check_runs }}
-        run: node runner/report-gates.mjs start
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/report-gates.mjs start
 
       - name: Derive the full mutation set for the evidence bundle
         # always() && ready: runs on the preconditions being met, never on whether the
         # check runs were successfully coloured in.
         if: always() && steps.ready.outputs.ready == '1'
+        env:
+          PKG: ${{ steps.cfg.outputs.package }}
         run: |
           # `--list` derives and exits before the baseline, so this needs python3 but
           # not sui and costs seconds. It answers a question the smoke gate cannot:
@@ -191,19 +338,94 @@ jobs:
           # second would understate the work left undone, so the bundle carries both —
           # and if this step produces nothing, the bundle says the total is unknown
           # rather than guessing it.
-          bash engine/move-mutate/move-mutate.sh "client/${{ steps.cfg.outputs.package }}" --list \
+          #
+          # SANDBOXED, like the gates. This one is our Python reading their Move sources
+          # rather than their code running, but the distinction is exactly the kind that
+          # is cheap to be right about here and expensive to be wrong about anywhere else.
+          bash "$RUNNER_TEMP/pvs-tooling/runner"/sandbox.sh "$PVS_SANDBOX_ROOT" \
+            bash engine/move-mutate/move-mutate.sh "client/$PKG" --list \
             > derive.log 2>&1 || true
 
+      # THE MEASUREMENT. Named exactly `Run the gates` on purpose: it is the step the
+      # runner's wiring tests address by name, and a rename would silently un-test it.
       - name: Run the gates
         # THE MEASUREMENT. Conditioned on the preconditions and on nothing else — not on
         # the marking step, not on the derivation step above it. If either of those
         # failed, the client still gets measured.
         if: always() && steps.ready.outputs.ready == '1'
+        env:
+          PKG: ${{ steps.cfg.outputs.package }}
         run: |
+          # SANDBOXED — no credential is reachable from this step. `sui move test` runs
+          # the client's bytecode, `sui move build` fetches and compiles their declared
+          # dependencies, and gates.sh honours their own scripts/check-framework-pin.sh,
+          # which is arbitrary shell. All of it runs as an unprivileged uid, from an
+          # `env -i` allowlist, in a tree that holds nothing of ours.
+          #
           # The engine's exit code is deliberately not this step's: verdicts come from its
           # output, per gate, and the sweep step turns any silence into an explicit failure.
-          bash engine/ci/gates.sh "client/${{ steps.cfg.outputs.package }}" \
-            --mutation-limit "$MUTATION_LIMIT" 2>&1 | tee gates.log || true
+          #
+          # $PKG is passed as an argv element, never spliced into a command line, and was
+          # validated against a path allowlist by preflight before it got here.
+          bash "$RUNNER_TEMP/pvs-tooling/runner"/sandbox.sh "$PVS_SANDBOX_ROOT" \
+            bash engine/ci/gates.sh "client/$PKG" --mutation-limit "$MUTATION_LIMIT" \
+            2>&1 | tee gates.log || true
+
+      - name: Extract the measurement from the sandbox
+        # The mutation report is written inside /srv/pvs by a uid the workspace does not
+        # share, so the evidence bundle cannot read it where it lies. Copy out that ONE
+        # file — never the tree — so the bundle writer never has to run inside the
+        # sandbox, and the sandbox never gets a way to write into the workspace.
+        #
+        # always(): a run that died half way through still measured whatever it measured,
+        # and the bundle's whole discipline is that an unmeasured count serialises as
+        # null with a reason rather than as a zero. Losing the file here would turn a
+        # partial measurement into a silent one.
+        if: always() && steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '0'
+        env:
+          PKG: ${{ steps.cfg.outputs.package }}
+        run: |
+          SRC="$PVS_SANDBOX_ROOT/client/$PKG/mutation-report.json"
+          DEST="client/$PKG/mutation-report.json"
+          if sudo test -L "$SRC"; then
+            echo "::warning title=PVS evidence bundle::The mutation report in the sandbox is a symlink. Refusing to follow it out; the bundle will record the counts as unmeasured."
+          elif sudo test -f "$SRC"; then
+            mkdir -p "client/$PKG"
+            sudo cp "$SRC" "$DEST"
+            sudo chown "$(id -u):$(id -g)" "$DEST"
+            echo "mutation report extracted: $(wc -c < "$DEST") bytes"
+          else
+            echo "no mutation report in the sandbox — the bundle will record the counts as unmeasured, not as zero"
+          fi
+
+      - name: Prove the sandbox held
+        # Runs BEFORE anything else reads from this tree. If the client's code reached
+        # our tooling or our engine, the correct outcome is a loud failed run — not a
+        # verdict computed by a script a stranger just edited.
+        #
+        # `intact` is published as an output so the two steps that would otherwise
+        # execute or publish from a tampered tree can decline. That is NOT a delivery
+        # precondition on a measurement: a tripped tripwire means there is no measurement
+        # we can vouch for, which is the one case the measurement-outlives-reporting rule
+        # does not cover. The bundle upload below stays unconditional so the wreckage is
+        # still recorded.
+        id: integrity
+        if: always() && steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '0'
+        run: |
+          find runner worker engine -type f -not -path '*/__pycache__/*' -print0 \
+            | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/tooling-after.sha256"
+          if ! diff -u "$RUNNER_TEMP/tooling-before.sha256" "$RUNNER_TEMP/tooling-after.sha256"; then
+            echo "intact=0" >> "$GITHUB_OUTPUT"
+            echo "::error title=PVS sandbox breach::A file under runner/, worker/ or engine/ changed while the client's code was running. No verdict will be posted from this tree. Treat this run's installation token as compromised and revoke it."
+            exit 1
+          fi
+          if ! sha256sum -c engine/CHECKSUMS; then
+            echo "intact=0" >> "$GITHUB_OUTPUT"
+            echo "::error title=PVS sandbox breach::The engine no longer matches its recorded hashes after the client's run."
+            exit 1
+          fi
+          echo "intact=1" >> "$GITHUB_OUTPUT"
+          echo "tooling and engine unchanged across the client's run"
 
       - name: Build the evidence bundle
         # Built BEFORE the verdicts are posted, because the verdicts now carry the
@@ -214,21 +436,26 @@ jobs:
         # always(): a run that died half way through still produces a bundle, and the
         # gates that never reported serialise as null with the reason recorded — never
         # as zero. A bundle that only exists for clean runs is exactly the bundle an
-        # auditor cannot rely on.
+        # auditor cannot rely on. The one exception is a tripped tripwire, because this
+        # step executes engine code from the tree the tripwire just called into question.
         #
         # `|| echo` for the same reason the writer's own main() always returns 0: this
         # step records the measurement, and a recorder that can veto the thing it
         # records is a recorder nobody should trust. If it dies, the verdicts still go
         # out — without the evidence summary, and saying so.
-        if: always() && steps.cfg.outputs.found == '1'
+        if: always() && steps.cfg.outputs.found == '1' && steps.integrity.outputs.intact != '0'
+        env:
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          PKG: ${{ steps.cfg.outputs.package }}
         run: |
           python3 engine/evidence/evidence_bundle.py \
             --out evidence \
-            --repository "${{ inputs.repository }}" \
-            --commit "${{ inputs.head_sha }}" \
-            --package-path "${{ steps.cfg.outputs.package }}" \
+            --repository "$CLIENT_REPOSITORY" \
+            --commit "$HEAD_SHA" \
+            --package-path "$PKG" \
             --gates-log gates.log \
-            --mutation-report "client/${{ steps.cfg.outputs.package }}/mutation-report.json" \
+            --mutation-report "client/$PKG/mutation-report.json" \
             --derive-log derive.log \
             --mutation-limit "$MUTATION_LIMIT" \
             || echo "::warning title=PVS evidence bundle::The evidence bundle could not be written. The gate verdicts below are unaffected; they simply carry no digest."
@@ -238,14 +465,20 @@ jobs:
         # if any verdict could not be posted — "measured, could not report" is a loud
         # failure of our service — and the upload below is always(), so the bundle
         # carrying those same verdicts survives the failure.
-        if: always() && steps.cfg.outputs.found == '1'
+        #
+        # The two extra conjuncts are NOT upstream failures, which is why they do not
+        # violate the rule above: a refused package has no gates log to report, and a
+        # tripped tamper tripwire means there is no measurement we can vouch for.
+        if: always() && steps.cfg.outputs.found == '1' && steps.deps.outputs.refused == '0' && steps.integrity.outputs.intact != '0'
         env:
           CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
           CHECK_RUNS: ${{ inputs.check_runs }}
-        run: node runner/report-gates.mjs report gates.log evidence/manifest.json
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/report-gates.mjs report gates.log evidence/manifest.json
 
       - name: Upload the evidence bundle
+        # Unconditional on the tripwire as well as on everything else: if the sandbox
+        # was breached, the record of the run is the single most useful thing to keep.
         if: always() && steps.cfg.outputs.found == '1'
         uses: actions/upload-artifact@v4
         with:
@@ -253,6 +486,10 @@ jobs:
           path: evidence/
           if-no-files-found: warn
           retention-days: 90
+
+      - name: Tear the sandbox down
+        if: always()
+        run: sudo rm -rf "$PVS_SANDBOX_ROOT" || true
 
       - name: Sweep unfinished check runs
         # Handed the gates log on purpose. Without it the sweep would mark every
@@ -264,4 +501,16 @@ jobs:
           CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
           CHECK_RUNS: ${{ inputs.check_runs }}
-        run: node runner/report-gates.mjs sweep gates.log
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/report-gates.mjs sweep gates.log
+
+      - name: Hand the installation token back
+        # LAST, and always(). GitHub mints installation tokens with a fixed one-hour life
+        # and offers no way to ask for less, so the only lever we have on "how long is a
+        # stolen copy useful for" is to end it ourselves the moment the job stops needing
+        # it. Nothing below this line may use the token.
+        if: always()
+        env:
+          CLIENT_TOKEN: ${{ steps.mint.outputs.token }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
+          CHECK_RUNS: ${{ inputs.check_runs }}
+        run: node "$RUNNER_TEMP/pvs-tooling/runner"/report-gates.mjs revoke

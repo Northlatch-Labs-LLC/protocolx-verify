@@ -13,8 +13,8 @@
 // hardcoded.
 
 import {
-  verifyWebhookSignature, appJwt, routeEvent, GATES, checkName,
-  canonicalDigest, timingSafeEqual,
+  verifyWebhookSignature, appJwt, routeEvent, GATES, checkName, timingSafeEqual,
+  canonicalDigest, installationTokenRequest, WORKER_TOKEN_PERMISSIONS,
 } from './lib.js';
 import {
   LEDGER_EVENTS, usageLedger, recordInstallationEvent, recordRunBatch, usageSnapshot,
@@ -343,10 +343,15 @@ export default {
       return Response.json({ error: 'event carries no installation, repository, or head sha' }, { status: 400 });
     }
 
-    // Authenticate as the App, then as this specific installation — the installation
-    // token is scoped to exactly the repositories the client granted, nothing wider.
+    // Authenticate as the App, then as this specific installation — and narrow the
+    // token on both axes before it exists. An empty request body would mint a key to
+    // every repository in the installation with every permission the App holds; this
+    // worker only ever opens check runs on ONE repository, so that is all it asks for.
     const jwt = await appJwt(env.GH_APP_ID, env.GH_APP_PRIVATE_KEY);
-    const { token } = await gh(`/app/installations/${route.installationId}/access_tokens`, jwt, { method: 'POST' });
+    const { token } = await gh(`/app/installations/${route.installationId}/access_tokens`, jwt, {
+      method: 'POST',
+      body: JSON.stringify(installationTokenRequest(route.repository, WORKER_TOKEN_PERMISSIONS)),
+    });
 
     const checkRuns = {};
     for (const gate of GATES) {
