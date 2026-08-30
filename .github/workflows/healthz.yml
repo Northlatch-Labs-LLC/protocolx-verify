@@ -4,8 +4,8 @@
 # The door watch. If the front door dies at 3am, something must say so — this is
 # the something. Every six hours (off the hour, deliberately: scheduled jobs pile
 # up on the hour and get delayed), a clean machine knocks on /healthz and demands
-# "ok": true. A failed run is a red workflow and a notification to the org — free
-# alerting with no third-party service, which is the only kind the desk buys.
+# "ok": true. A failed run is a red workflow and a notification to the org — alerting
+# with no third-party service and no additional dependency.
 
 name: Door watch
 

@@ -102,7 +102,7 @@ L.push('');
 // The licence, stated where the person who adopted the action actually reads. This runs
 // entirely inside the client's CI and phones nowhere, so there is nothing here to meter
 // and nothing here to enforce; the terms travel with the output instead. Keep it to one
-// line. A client's build log is not a place to sell to them.
+// line.
 L.push('> **Licence** — Business Source License 1.1, in full at `LICENSE` in the action\'s repository. Running ProtocolX Verify in your own CI against code you own is granted at no charge, including in production, and you are meant to read the source: the sandbox is only credible if you can check it. Offering it to others as a hosted or resold verification service needs a commercial licence. On 2030-08-30 it converts to Apache-2.0. This run metered nothing and transmitted nothing. Contact: kaela@projectxprotocol.dev.');
 L.push('');
 

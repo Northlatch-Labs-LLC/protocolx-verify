@@ -1,7 +1,7 @@
 // Built-by: @projectx.sui /|\
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
-// The usage ledger — the measurement that makes a $149/repository/month invoice possible.
+// The usage ledger — the per-repository, per-month usage measurement.
 //
 // These tests are written against a REAL webhook delivery, not a hand-built object. The
 // installation/created payload in worker/test/fixtures was read out of our own App's
@@ -10,8 +10,8 @@
 //
 // The load-bearing assertion in this file is not "a record is created". It is that a
 // repository whose runs we did not record reads as null-with-a-reason and NEVER as 0.
-// A silent zero under-bills a paying customer and tells the desk they are idle when they
-// are not, and it is the one failure a metering system must not have.
+// A silent zero under-counts a repository and reads as idle when it is not, and it is
+// the one failure a metering system must not have.
 //
 // Run: node --test worker/test/ledger.test.mjs
 
@@ -161,7 +161,7 @@ test('installation/deleted ends the record and destroys nothing', () => {
 
   assert.equal(deleted.status, 'ended');
   assert.equal(deleted.endedAt, '2026-09-15T10:00:00.000Z');
-  // The estate archives; it does not delete. Everything the invoice needs survives.
+  // Records are archived, never deleted. Everything a count needs survives.
   assert.equal(deleted.installedAt.value, '2026-08-28T23:53:32.000Z');
   assert.ok(REAL_REPO in deleted.repositories, 'the repository row survives the uninstall');
   assert.equal(deleted.repositories[REAL_REPO].firstSeenAt, '2026-08-28T23:53:33.000Z');

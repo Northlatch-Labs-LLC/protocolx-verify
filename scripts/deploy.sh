@@ -8,8 +8,8 @@
 #   CF_ACCOUNT_ID  — the Cloudflare account id (visible on the dashboard's right sidebar)
 #   a token file   — ~/.config/protocolx/cloudflare-workers.token by default, holding an
 #                    API token created from the "Edit Cloudflare Workers" template.
-#                    The DNS token the estate already has CANNOT deploy workers — that was
-#                    tested against the API, not assumed.
+#                    A DNS-scoped token CANNOT deploy workers — that was tested against
+#                    the API, not assumed.
 #
 # Usage: CF_ACCOUNT_ID=... scripts/deploy.sh
 set -euo pipefail

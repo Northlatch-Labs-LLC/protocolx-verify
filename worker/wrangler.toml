@@ -13,7 +13,7 @@ compatibility_date = "2026-08-01"
 
 # --- the usage ledger ---------------------------------------------------------
 #
-# The metering that makes a $149/repository/month invoice possible. It needs one KV
+# The per-repository, per-month usage metering. It needs one KV
 # namespace bound as USAGE_LEDGER and one secret, LEDGER_READ_TOKEN, for the read
 # endpoint. Neither exists yet, so today the ledger records nothing and /healthz says
 # `usage_ledger: not bound`.
@@ -22,21 +22,21 @@ compatibility_date = "2026-08-01"
 # endpoint answers a named 503. It never answers "zero usage", because it has not
 # measured zero — it has measured nothing.
 #
-# STORAGE: Workers KV, chosen on measurement taken 2026-08-30 against the estate's own
-# account (e5f84b4c…) with the estate's own Workers token:
+# STORAGE: Workers KV, chosen on measurement taken 2026-08-30 against our own account
+# with our own Workers token:
 #   - R2   → 403, `10042 — Please enable R2 through the Cloudflare Dashboard`. Not
 #            enabled, and enabling it is a console trip.
-#   - D1   → `10000 Authentication error` with the estate's Workers token. The product
-#            is on the account but the token that runs our deploys cannot provision or
-#            bind it, so choosing D1 means minting and custodying a second token.
-#   - KV   → lists clean (zero namespaces). The estate's token reaches it today.
+#   - D1   → `10000 Authentication error` with that Workers token. The product is on the
+#            account but the token that runs our deploys cannot provision or bind it, so
+#            choosing D1 means minting and custodying a second token.
+#   - KV   → lists clean (zero namespaces). That token reaches it today.
 # KV also has no atomic increment, which is exactly why the run counter is append-only
 # (one key per delivery, count the distinct delivery ids) rather than read-modify-write.
 # The store is reached through three calls — get/put/list — so moving to D1 or R2 later
 # is a binding swap, not a rewrite.
 #
-# To enable, once the ruling is in:
-#   1. create the namespace with the token the estate already holds:
+# To enable:
+#   1. create the namespace with the existing Workers token:
 #        curl -sS -X POST \
 #          "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces" \
 #          -H "Authorization: Bearer $(cat ~/.config/protocolx/cloudflare-workers.token)" \
@@ -54,8 +54,8 @@ compatibility_date = "2026-08-01"
 # The content-addressed evidence store needs a KV namespace bound as EVIDENCE_STORE,
 # the var EVIDENCE_STORE_ENABLED set to exactly "on", and the secret
 # EVIDENCE_WRITE_TOKEN for writes. None exists, and the namespace does not exist:
-# publishing real client evidence is the Owner's product decision, not a side effect of
-# a deploy. With any of the three missing, /evidence/ serves nothing and stores nothing,
+# publishing real client evidence is a deliberate configuration decision, not a side
+# effect of a deploy. With any of the three missing, /evidence/ serves nothing and stores nothing,
 # and /healthz says `evidence_store: disabled`.
 #
 # It wants a SEPARATE namespace from the ledger's, not a shared one with prefixed keys.
@@ -65,14 +65,14 @@ compatibility_date = "2026-08-01"
 # mistake away from serving the metering data at a public URL.
 #
 # STORAGE: Workers KV, on the same measurement recorded above for the ledger — R2 is not
-# enabled, D1 needs a second credential, KV is reachable with the token the estate
-# already holds. The workload also suits it: manifests are 4–8 KB, immutable, and
+# enabled, D1 needs a second credential, KV is reachable with the existing token.
+# The workload also suits it: manifests are 4–8 KB, immutable, and
 # write-once-read-many, and eventual consistency is harmless for content-addressed
 # blobs, where a read-after-write miss is a brief 404 on a key whose content can never
 # change. KV's free-tier write ceiling is the thing that would eventually argue for R2;
 # the store is reached through get/put only, so that move is a binding swap.
 #
-# To enable, once the ruling is in:
+# To enable:
 #   1. create a second namespace with the same token:
 #        curl -sS -X POST \
 #          "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces" \
