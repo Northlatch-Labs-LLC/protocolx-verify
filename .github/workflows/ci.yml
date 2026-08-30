@@ -1,7 +1,7 @@
 # Built-by: @projectx.sui /|\
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
-# The product that sells gates runs gates on itself. Every pull request here proves,
+# The tool that measures gates runs its own gates on itself. Every pull request here proves,
 # on a machine that has never seen this repository: the crypto and routing logic
 # passes its tests against an independent implementation, every shell script parses,
 # every JS entrypoint parses, and the engine copies are still byte-identical to the
@@ -99,7 +99,7 @@ jobs:
         run: node --test runner/test/wiring.test.mjs
 
       - name: Evidence bundle unit tests
-        # The bundle is the document a buyer's auditor is handed. These prove its
+        # The bundle is the document an auditor is handed. These prove its
         # numbers are the engine's numbers, that its digest reproduces across runs and
         # moves when a result moves, and that a gate which never ran serialises as
         # null with a reason rather than as a zero.
@@ -116,8 +116,8 @@ jobs:
         # The defect this guards, found 2026-08-30: the shipped engine was missing
         # lib/shadow.py entirely and its loader never named it, hours after a sync
         # from canonical. The App therefore ran a measurably different engine from
-        # the one the desk runs in-house, and neither copy was authoritative. That is
-        # exactly what our own digest gate sells against — the thing that runs is not
+        # the one run in-house, and neither copy was authoritative. That is
+        # exactly what our own digest gate defends against — the thing that runs is not
         # the thing in the repository. Checks provenance, per-file hashes, and that
         # the module loader agrees with the modules actually shipped.
         run: bash engine/test/engine-drift.sh

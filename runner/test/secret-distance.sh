@@ -59,8 +59,8 @@ export GITHUB_STEP_SUMMARY="$WORK/step-summary"
 export GITHUB_TOKEN='ghs_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
 export AWS_SECRET_ACCESS_KEY='wJalrXUtnFEMI'
 export CF_API_TOKEN='cloudflare'
-# Not credentials, but write handles to the estate's own records: a KV binding and a
-# flag. The client's build must not hold either.
+# Not credentials, but write handles to our own records: a KV binding and a flag.
+# The client's build must not hold either.
 export EVIDENCE_STORE='kv-binding-object'
 export EVIDENCE_STORE_ENABLED='on'
 export USAGE_LEDGER='kv-binding-object'

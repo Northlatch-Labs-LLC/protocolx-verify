@@ -324,9 +324,8 @@ test('oversized and non-JSON bodies are refused', async () => {
 
 // --- 4. coexistence with the usage ledger -------------------------------------
 //
-// Verified here rather than inherited. The ledger desk proved this in a throwaway
-// worktree before either branch landed; a proof in a discarded worktree protects
-// nothing, so it is re-established as committed tests against the merged file.
+// Verified here rather than inherited: a proof that lives outside the repository
+// protects nothing, so it is established as committed tests against the merged file.
 //
 // The two features share a front door and nothing else. `/usage` is an exact match and
 // `/evidence/` is a prefix, so neither can shadow the other whichever order they are

@@ -1,22 +1,20 @@
 // Built-by: @projectx.sui /|\
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
-// THE USAGE LEDGER — the measurement that makes an invoice possible.
+// THE USAGE LEDGER — per-repository usage metering.
 //
-// ProtocolX Verify is priced at $149 per repository per month. Before this file there
-// was no way to know what to invoice, which made the price fictional. This is not a
-// billing system: no payments, no cards, no subscriptions, no vendor. The estate
-// invoices in USDC on Sui, by hand, and this is the document a human reads on the
-// first of the month to write those invoices.
+// Usage is metered per repository per month. This is not a billing system: no payments,
+// no cards, no subscriptions, no vendor. It records what was delivered, and a human
+// reads it at the end of a period.
 //
 // THREE RULES GOVERN IT, and they matter more than the feature.
 //
 // 1. ABSENCE IS NOT ZERO. A repository whose runs we did not record reads as
 //    `{value: null, reason: "…"}`, never as 0. Rendering "we measured nothing" and
-//    "we measured nothing happening" identically under-bills silently and, worse,
-//    tells the desk a paying customer is idle when they are not. This is the same
-//    convention engine/evidence/evidence_bundle.py already holds the estate to, and
-//    it is copied deliberately rather than reinvented.
+//    "we measured nothing happening" identically under-counts silently and, worse,
+//    reads as an idle repository when it is not. This is the same convention
+//    engine/evidence/evidence_bundle.py already uses, copied deliberately rather than
+//    reinvented.
 //
 // 2. THE COUNTER IS APPEND-ONLY, NOT READ-MODIFY-WRITE. Workers KV has no atomic
 //    increment and is eventually consistent, so `get → n+1 → put` loses a count every
@@ -27,10 +25,10 @@
 //    because a redelivery carries the same X-GitHub-Delivery guid.
 //
 // 3. IDENTIFIERS AND COUNTS ONLY. Account login/id/type, repository full name/id, the
-//    public-or-private flag (the free tier turns on it), timestamps, counts. NOTHING
-//    about what the client's code contains: no findings, no survivors, no gate
-//    verdicts, no commit shas, no file paths, no diff. A usage ledger that leaks what
-//    we measured is a breach of the thing we sell. The commit sha is deliberately NOT
+//    public-or-private flag, timestamps, counts. NOTHING about what the client's code
+//    contains: no findings, no survivors, no gate verdicts, no commit shas, no file
+//    paths, no diff. A usage ledger that leaks what we measured is a breach of the
+//    confidentiality the measurement is performed under. The commit sha is deliberately NOT
 //    the uniqueness key for a run — the webhook delivery guid is, which is opaque,
 //    tells us nothing about their repository, and de-duplicates better.
 //
@@ -172,10 +170,9 @@ export function unnamedRepositoryCount(list) {
 // --- the installation record ----------------------------------------------------
 //
 // One JSON document per installation, and it is never deleted. An uninstall sets
-// endedAt and status; a removed repository gets removedAt. The estate archives, it
-// does not destroy: a repository dropped from the selection is still a repository we
-// billed for the days it was there, and a deleted record is an invoice we cannot
-// defend.
+// endedAt and status; a removed repository gets removedAt. Records are archived, never
+// destroyed: a repository dropped from the selection is still a repository that was in
+// scope for the days it was there, and a deleted record is a count nobody can defend.
 
 export const LEDGER_EVENTS = ['installation', 'installation_repositories'];
 

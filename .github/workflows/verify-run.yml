@@ -5,7 +5,7 @@
 #
 # The worker (the app's front door) dispatches this workflow with a client repository,
 # a commit, and the ids of the check runs it opened. This job fetches that exact commit
-# with a short-lived installation token, runs the estate's gate engine verbatim
+# with a short-lived installation token, runs the gate engine verbatim
 # (engine/ci/gates.sh — build, digest guard, tests, framework pin, mutation smoke), and
 # writes each gate's verdict back onto the client's commit as a completed check run.
 #
@@ -51,7 +51,7 @@
 # filtered. See "Network and persistence" in README.md.
 # ─────────────────────────────────────────────────────────────────────────────────────
 #
-# Discipline carried over from the estate's own CI:
+# Discipline carried over from this repository's own CI:
 #   - THE MEASUREMENT IS THE PRODUCT; REPORTING IS HOW WE HAND IT OVER. The gates are
 #     conditioned on the things measuring actually needs — the client's code, sui,
 #     python3, a self-tested engine — and on nothing about GitHub's check-run API. A

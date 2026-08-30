@@ -110,7 +110,7 @@ async function gh(path, token, init = {}) {
 // us, on our clock, for as long as we choose to serve it.
 //
 // INERT BY DEFAULT, AND BY CONSTRUCTION. Turning this on for real client evidence is a
-// product decision the Owner makes, not one a deploy makes. Three separate things must
+// deliberate configuration decision, not one a deploy makes. Three separate things must
 // all be true before a single byte is stored or served:
 //   1. EVIDENCE_STORE_ENABLED is exactly "on" — a deliberate switch, not a truthy value.
 //   2. EVIDENCE_STORE is bound — a KV namespace that does not exist yet.
