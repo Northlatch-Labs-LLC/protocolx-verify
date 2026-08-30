@@ -141,6 +141,48 @@ export function parseGatesOutput(text) {
   return results;
 }
 
+// What the sweep should write onto each check run that is still unfinished.
+//
+// THE ONE HARD RULE. "We measured this and could not tell you" is not "this never
+// ran". The sweep exists because silence must not read as a pass — but a gate whose
+// verdict is sitting in the engine's log, unposted because a GitHub call failed, has
+// a verdict. Marking it "gate never reported" would destroy a measurement we actually
+// have and would tell the client their code was never checked when it was.
+//
+// So the sweep reads the log first. A gate the engine ruled on is re-posted with its
+// real verdict; only a gate the engine never ruled on gets the never-ran failure.
+// With no log at all, nothing was measured and every unfinished gate is never-ran —
+// which is correct, because in that case we genuinely have no evidence it ran.
+export function sweepPlan(gatesLogText, unfinishedGates) {
+  const measured = gatesLogText ? parseGatesOutput(gatesLogText) : {};
+  const plan = {};
+  for (const gate of unfinishedGates) {
+    const result = measured[gate];
+    if (result) {
+      plan[gate] = {
+        kind: 'measured',
+        conclusion: result.conclusion,
+        title: result.note.slice(0, 120) || result.conclusion,
+        note:
+          'Measured, then not delivered on the first attempt: this verdict came from the '
+          + 'engine during the run, and the call that should have posted it did not reach '
+          + 'GitHub. This is the retry. The measurement is not in doubt; only its delivery was.',
+      };
+    } else {
+      plan[gate] = {
+        kind: 'never-ran',
+        conclusion: 'failure',
+        title: 'gate never reported',
+        note:
+          'The runner ended without a verdict for this gate — it died or the gate never '
+          + 'ran. The runner workflow log has the story. This is not a statement about '
+          + 'your code: nothing was measured.',
+      };
+    }
+  }
+  return plan;
+}
+
 // Words the evidence summary may not contain.
 //
 // A surviving mutation is an invariant no test exercises. The moment a check run

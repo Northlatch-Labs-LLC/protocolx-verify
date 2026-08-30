@@ -49,6 +49,12 @@ jobs:
       - name: Mutation engine unit tests
         run: python3 engine/move-mutate/test/test_movemutate.py
 
+      - name: Runner wiring (measurement must not depend on reporting)
+        # Structural, on purpose. The gates were once conditioned on a step whose only
+        # job was to colour five check runs yellow, so an API hiccup skipped the whole
+        # measurement. Nothing in the repository would have caught that regression.
+        run: node --test runner/test/wiring.test.mjs
+
       - name: Evidence bundle unit tests
         # The bundle is the document a buyer's auditor is handed. These prove its
         # numbers are the engine's numbers, that its digest reproduces across runs and
@@ -85,6 +91,7 @@ jobs:
           node --check worker/test/ledger.test.mjs
           node --check runner/mint-token.mjs
           node --check runner/report-gates.mjs
+          node --check runner/test/wiring.test.mjs
 
       - name: Every module the worker imports is actually deployed
         # scripts/deploy.sh uploads an explicit module list to the Cloudflare API. A new
