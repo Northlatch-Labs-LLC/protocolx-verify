@@ -14,6 +14,12 @@
 #   - The gates step never hard-fails the job: verdicts are read from the engine's own
 #     output, and a gate that never reported is swept to an explicit failure at the end.
 #     "Never ran" must not read as "passed".
+#   - Every run emits an EVIDENCE BUNDLE (evidence/manifest.json · evidence/REPORT.md,
+#     uploaded as a workflow artifact). A check run is five coloured rows that live as
+#     long as GitHub keeps the page; an auditor cannot cite one. The bundle is the same
+#     facts as a file, with a reproducible digest over them, and it is built in an
+#     always() step so a run that died half way through still leaves a record saying
+#     which gates never reported.
 #   - Pinned Python: the mutation engine's derivation and reporting stages are Python 3
 #     (standard library only). It is pinned for the same reason Sui is — a floating
 #     interpreter changes behaviour without a line of any repository changing — and it is
@@ -51,6 +57,10 @@ concurrency:
 env:
   SUI_VERSION: mainnet-v1.77.2
   PYTHON_VERSION: '3.11'
+  # One value, read by both the gate battery and the evidence bundle. Two copies of
+  # this number would drift, and a bundle that reported a limit the gates did not
+  # apply would misstate how much of the package was actually measured.
+  MUTATION_LIMIT: '5'
 
 jobs:
   verify:
@@ -138,12 +148,26 @@ jobs:
           CHECK_RUNS: ${{ inputs.check_runs }}
         run: node runner/report-gates.mjs start
 
+      - name: Derive the full mutation set for the evidence bundle
+        if: steps.cfg.outputs.found == '1'
+        run: |
+          # `--list` derives and exits before the baseline, so this needs python3 but
+          # not sui and costs seconds. It answers a question the smoke gate cannot:
+          # the gate runs with a limit and therefore reports how many mutations it RAN,
+          # not how many the package contains. Publishing the first as if it were the
+          # second would understate the work left undone, so the bundle carries both —
+          # and if this step produces nothing, the bundle says the total is unknown
+          # rather than guessing it.
+          bash engine/move-mutate/move-mutate.sh "client/${{ steps.cfg.outputs.package }}" --list \
+            > derive.log 2>&1 || true
+
       - name: Run the gates
         if: steps.cfg.outputs.found == '1'
         run: |
           # The engine's exit code is deliberately not this step's: verdicts come from its
           # output, per gate, and the sweep step turns any silence into an explicit failure.
-          bash engine/ci/gates.sh "client/${{ steps.cfg.outputs.package }}" --mutation-limit 5 2>&1 | tee gates.log || true
+          bash engine/ci/gates.sh "client/${{ steps.cfg.outputs.package }}" \
+            --mutation-limit "$MUTATION_LIMIT" 2>&1 | tee gates.log || true
 
       - name: Report gate verdicts
         if: steps.cfg.outputs.found == '1'
@@ -152,6 +176,32 @@ jobs:
           CLIENT_REPOSITORY: ${{ inputs.repository }}
           CHECK_RUNS: ${{ inputs.check_runs }}
         run: node runner/report-gates.mjs report gates.log
+
+      - name: Build the evidence bundle
+        # always(): a run that died half way through still produces a bundle, and the
+        # gates that never reported serialise as null with the reason recorded — never
+        # as zero. A bundle that only exists for clean runs is exactly the bundle an
+        # auditor cannot rely on.
+        if: always() && steps.cfg.outputs.found == '1'
+        run: |
+          python3 engine/evidence/evidence_bundle.py \
+            --out evidence \
+            --repository "${{ inputs.repository }}" \
+            --commit "${{ inputs.head_sha }}" \
+            --package-path "${{ steps.cfg.outputs.package }}" \
+            --gates-log gates.log \
+            --mutation-report "client/${{ steps.cfg.outputs.package }}/mutation-report.json" \
+            --derive-log derive.log \
+            --mutation-limit "$MUTATION_LIMIT"
+
+      - name: Upload the evidence bundle
+        if: always() && steps.cfg.outputs.found == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ inputs.head_sha }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Sweep unfinished check runs
         if: always()

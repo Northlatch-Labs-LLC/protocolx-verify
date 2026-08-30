@@ -1,0 +1,98 @@
+{
+  "tool": {
+    "name": "move-mutate",
+    "version": "0.2.0"
+  },
+  "independence_clause": "This is an internal review by the party that wrote the code. It is evidence, not an audit: no claim of independence is made, and none should be inferred.",
+  "survivor_meaning": "A surviving mutant names an invariant that no test exercises. It is not, by itself, an exploit or a finding of vulnerability.",
+  "manifest": {
+    "package": "/private/tmp/claude-501/-Users-admin-WORK-CLAUDE/750ac67f-fd53-4550-9a3c-b8e60a0eb7ff/scratchpad/nf",
+    "repo_url": "",
+    "commit_sha": "",
+    "working_tree_dirty_files": "0",
+    "toolchain": "sui 1.77.2-51d177ad7d65",
+    "tool_version": "0.2.0",
+    "derivation_mode": "legacy-line",
+    "operator_classes": [
+      "DEL"
+    ],
+    "multiline_enabled": false,
+    "derived": 4,
+    "mutation_set_sha256": "d92a0c0654cdef9ec712872933dea1ef4b29491a8d41d3ca73ec4346242cce8e",
+    "excluded_test_files": 1,
+    "jobs": "1",
+    "test_filtering": "off",
+    "started_utc": "2026-08-30T04:46:23Z",
+    "finished_utc": "2026-08-30T04:47:52Z",
+    "restore_verified": "verified"
+  },
+  "score": {
+    "executed": 4,
+    "killed": 0,
+    "survived": 4,
+    "invalid_did_not_compile": 0,
+    "confirmed_equivalent": 0,
+    "denominator": 4,
+    "formula": "mutation score = killed / (executed - did-not-compile - confirmed-equivalent)",
+    "mutation_score_pct": 0.0
+  },
+  "results": [
+    {
+      "id": "sources/market/model.move:7:DEL#0",
+      "file": "sources/market/model.move",
+      "line": 7,
+      "rule_id": "DEL",
+      "original": "assert!(bps <= 10000, EBadRate);",
+      "outcome": "survived",
+      "proposals": []
+    },
+    {
+      "id": "sources/obligation/access.move:7:DEL#0",
+      "file": "sources/obligation/access.move",
+      "line": 7,
+      "rule_id": "DEL",
+      "original": "assert!(who == owner, ENotAuthorized);",
+      "outcome": "survived",
+      "proposals": []
+    },
+    {
+      "id": "sources/obligation/access.move:11:DEL#0",
+      "file": "sources/obligation/access.move",
+      "line": 11,
+      "rule_id": "DEL",
+      "original": "assert!(n >= 1, EBadKey);",
+      "outcome": "survived",
+      "proposals": []
+    },
+    {
+      "id": "sources/obligation/access.move:12:DEL#0",
+      "file": "sources/obligation/access.move",
+      "line": 12,
+      "rule_id": "DEL",
+      "original": "assert!(n <= 16, EBadKey);",
+      "outcome": "survived",
+      "proposals": []
+    }
+  ],
+  "skipped": [],
+  "excluded_test_internal": [
+    {
+      "file": "sources/market/model.move",
+      "line": 12,
+      "text": "assert!(1 == 1, 0);",
+      "reason": "test-internal (enclosing #[test]/#[test_only])"
+    },
+    {
+      "file": "sources/market/model.move",
+      "line": 13,
+      "text": "assert!(2 == 2, 0);",
+      "reason": "test-internal (enclosing #[test]/#[test_only])"
+    },
+    {
+      "file": "sources/market/model.move",
+      "line": 18,
+      "text": "assert!(x < 5, EBadRate);",
+      "reason": "test-internal (enclosing #[test]/#[test_only])"
+    }
+  ]
+}
