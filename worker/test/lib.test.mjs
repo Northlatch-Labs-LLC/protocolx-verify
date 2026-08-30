@@ -25,6 +25,9 @@ import {
   FORBIDDEN_SUMMARY_TERMS,
   GATES,
   checkName,
+  installationTokenRequest,
+  RUNNER_TOKEN_PERMISSIONS,
+  WORKER_TOKEN_PERMISSIONS,
 } from '../src/lib.js';
 
 const te = new TextEncoder();
@@ -303,4 +306,45 @@ test('the sweep plans nothing for gates that already completed', () => {
   // Only unfinished gates are passed in; a completed gate must not be touched, because
   // re-posting it could overwrite a delivered verdict with a stale one.
   assert.deepEqual(sweepPlan(MEASURED_LOG, []), {});
+});
+
+// --- blast radius of a stolen installation token -------------------------------------
+//
+// The default here is the dangerous one and it is an EMPTY BODY: GitHub reads that as
+// "every permission this App holds, on every repository in the installation". These
+// tests exist so nobody can quietly go back to it — a client who installs the App
+// org-wide must not be handing our runner a key to forty repositories in order to have
+// one commit verified.
+
+test('an installation token is narrowed to one repository and the permissions the job needs', () => {
+  const runner = installationTokenRequest('Northlatch-Labs-LLC/weir', RUNNER_TOKEN_PERMISSIONS);
+  // NAMES, not owner/name — GitHub answers 422 to the latter, and a 422 here reads like
+  // a permissions problem rather than a shape problem.
+  assert.deepEqual(runner.repositories, ['weir']);
+  assert.deepEqual(runner.permissions, { contents: 'read', checks: 'write', metadata: 'read' });
+
+  const worker = installationTokenRequest('owner/name', WORKER_TOKEN_PERMISSIONS);
+  assert.deepEqual(worker.repositories, ['name']);
+  // The worker only ever opens check runs. It has no business reading anybody's source.
+  assert.equal('contents' in worker.permissions, false);
+  assert.deepEqual(worker.permissions, { checks: 'write', metadata: 'read' });
+});
+
+test('the permission sets never widen past what the App manifest grants', () => {
+  // app/app-manifest.json: checks:write, contents:read, metadata:read, pull_requests:read.
+  const granted = new Set(['checks', 'contents', 'metadata', 'pull_requests']);
+  for (const set of [RUNNER_TOKEN_PERMISSIONS, WORKER_TOKEN_PERMISSIONS]) {
+    for (const name of Object.keys(set)) {
+      assert.equal(granted.has(name), true, `${name} is not a permission the App holds`);
+    }
+  }
+  assert.equal('administration' in RUNNER_TOKEN_PERMISSIONS, false);
+  assert.equal('workflows' in RUNNER_TOKEN_PERMISSIONS, false);
+});
+
+test('a malformed repository yields no repositories field rather than a wrong one', () => {
+  // Silently scoping to the wrong repository would be worse than not scoping: the run
+  // would fail in a way that invites someone to "fix" it by removing the scope.
+  assert.equal('repositories' in installationTokenRequest('nameonly', RUNNER_TOKEN_PERMISSIONS), false);
+  assert.equal('repositories' in installationTokenRequest(undefined, RUNNER_TOKEN_PERMISSIONS), false);
 });

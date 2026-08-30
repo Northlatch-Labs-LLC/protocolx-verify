@@ -54,6 +54,21 @@ jobs:
         # Also proves the permalink stays inert and that it cannot shadow /usage.
         run: node --test worker/test/evidence-store.test.mjs
 
+      - name: Preflight — the values a stranger's repository gets to choose
+        # The package path and the dispatch inputs reach a shell; the client's Move.toml
+        # reaches git. These prove every one of them is checked against an allowlist
+        # before it does, including the git transports that are remote code execution.
+        run: node --test runner/test/preflight.test.mjs
+
+      - name: Secret distance — the step that runs client code holds no credential
+        # Two halves. Runtime: poison a shell with every secret the runner really holds,
+        # send a command through runner/sandbox.sh, and read back what the child actually
+        # got. Static: read verify-run.yml and prove the workflow puts client code behind
+        # that wrapper with nothing credentialed in scope. The first proves the wrapper
+        # works, the second proves it is used — and the second is the one a future edit
+        # breaks.
+        run: bash runner/test/secret-distance.sh
+
       - name: Mutation engine unit tests
         run: python3 engine/move-mutate/test/test_movemutate.py
 
@@ -86,7 +101,8 @@ jobs:
 
       - name: Every shell script parses
         run: |
-          for f in scripts/*.sh engine/ci/*.sh engine/move-mutate/*.sh engine/test/*.sh; do
+          for f in scripts/*.sh engine/ci/*.sh engine/move-mutate/*.sh engine/test/*.sh \
+                   runner/*.sh runner/test/*.sh; do
             bash -n "$f"
             echo "$f: OK"
           done
@@ -99,8 +115,12 @@ jobs:
           node --check worker/test/ledger.test.mjs
           node --check runner/mint-token.mjs
           node --check runner/report-gates.mjs
+          node --check runner/preflight.mjs
+          node --check runner/lib/preflight.mjs
           node --check runner/test/wiring.test.mjs
           node --check worker/test/evidence-store.test.mjs
+
+          node --check runner/test/preflight.test.mjs
 
       - name: Every module the worker imports is actually deployed
         # scripts/deploy.sh uploads an explicit module list to the Cloudflare API. A new
@@ -127,6 +147,9 @@ jobs:
 
       - name: Engine copies match their recorded hashes
         run: sha256sum -c engine/CHECKSUMS
+
+      - name: Every Python entrypoint parses
+        run: python3 -m py_compile runner/test/workflow-audit.py engine/move-mutate/lib/*.py
 
       - name: Manifest and workflow files are valid
         run: |

@@ -87,6 +87,33 @@ export async function appJwt(appId, privateKeyPem, nowSeconds = Math.floor(Date.
   return `${signingInput}.${b64urlFromBytes(sig)}`;
 }
 
+// --- how wide a stolen token is ------------------------------------------------------
+//
+// `POST /app/installations/:id/access_tokens` with an empty body mints a token carrying
+// EVERY permission the App holds on EVERY repository in the installation. That is the
+// default, and it is the wrong default for us: an installation on an org with forty
+// repositories hands the runner a key to all forty in order to verify one commit in one
+// of them.
+//
+// This narrows both axes to what the job at hand actually needs. GitHub enforces the
+// narrowing server-side, so the resulting token cannot be widened by anything that
+// steals it — the blast radius of a leak is one repository and two permissions for the
+// token's remaining lifetime.
+//
+// Note the `repositories` field takes bare NAMES, not owner/name; passing owner/name is
+// a silent 422 that reads like a permissions problem.
+export const RUNNER_TOKEN_PERMISSIONS = { contents: 'read', checks: 'write', metadata: 'read' };
+export const WORKER_TOKEN_PERMISSIONS = { checks: 'write', metadata: 'read' };
+
+export function installationTokenRequest(repository, permissions) {
+  const body = { permissions };
+  if (typeof repository === 'string' && repository.includes('/')) {
+    const name = repository.slice(repository.indexOf('/') + 1);
+    if (name) body.repositories = [name];
+  }
+  return body;
+}
+
 // The five gates, in the exact order and spelling of engine/ci/gates.sh — these names are
 // parsed back out of its output, so they are a contract, not a label.
 export const GATES = ['build', 'digest', 'tests', 'pin', 'mutation-smoke'];
