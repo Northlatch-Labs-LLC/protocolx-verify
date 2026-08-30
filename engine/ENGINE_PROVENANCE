@@ -2,7 +2,7 @@
 # The engine below is a downstream artifact of verification-tools,
 # which is canonical. See verification-tools/CANONICAL.md.
 source_repo: verification-tools
-source_commit: 1843535d93f46f69e23397e1ddb345e33169f3c4
+source_commit: 8a4421977de502009b5ec555cc46740b3855597c
 source_dirty_files: 0
 engine_files: 8
 loader_modules: apply.py derive.py movelex.py operators.py report.py shadow.py 
@@ -13,5 +13,5 @@ f8f808280dd9b26f026c46d478f0b4770f8293dda1ad73ea7d09b032fe939b6c  engine/move-mu
 3ffe5efd278c89fe4e2fc16c8478c0fae40496472b16a610ea2826f142c311a8  engine/move-mutate/lib/derive.py
 d45385422b4b89c3144b40694e8eee9196ef53dda3fafbde5246146665b850c8  engine/move-mutate/lib/movelex.py
 48218448aadeac1b504ede7b64547c9565585f7fb1029c38cc2ed87a5f21b2e0  engine/move-mutate/lib/operators.py
-33de2d22da99b895bb49bdb0ff14de76dd497c725b8621a9b4a86713f426708a  engine/move-mutate/lib/report.py
+b6f03c4854ee52faab2d9203981583a1a01c43d7d914ef170d32aacdac4cc5c9  engine/move-mutate/lib/report.py
 ae2868e7cbd6246a59dfaea3e621919e883768352eb3e9b86047bcf705c93b34  engine/move-mutate/lib/shadow.py
