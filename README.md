@@ -3,6 +3,11 @@
 
 # ProtocolX Verify
 
+> **What this repo is, among three that look alike.** This is **the product** — the GitHub Action,
+> the App, the worker, the thing customers install. Its `engine/` is a **downstream artifact**
+> synced from `verification-tools` and must never be hand-edited; see that repo's `CANONICAL.md`.
+> The third repo, `protocolx-verify-preflight`, is a private dry run of this one's public tree.
+
 Five verification gates for Sui Move packages, run inside your own CI: **build**,
 **deployed-digest guard**, **tests**, **framework pin**, **mutation smoke**. Every run
 leaves an evidence bundle with a reproducible digest.
