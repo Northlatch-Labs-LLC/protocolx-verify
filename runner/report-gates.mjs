@@ -5,7 +5,12 @@
 //
 // Modes:
 //   start                  — flip every check run to in_progress (the runner is alive)
-//   report <gates.log>     — parse the engine's log; complete each gate that reported
+//   report <gates.log> [manifest.json]
+//                          — parse the engine's log; complete each gate that reported.
+//                            When the evidence manifest is given, its digest and counts
+//                            ride in the check-run summary: a workflow artifact needs
+//                            Actions access and expires, but a check run is readable by
+//                            anyone who can see the pull request, forever.
 //   setup-needed           — client repo has no config; complete all gates neutral with
 //                            the setup instructions (a fresh install must not fail red)
 //   sweep                  — complete anything still unfinished as failure ("never ran
@@ -15,7 +20,7 @@
 //      CHECK_RUNS (JSON map gate → check-run id).
 
 import { readFileSync } from 'node:fs';
-import { parseGatesOutput, GATES } from '../worker/src/lib.js';
+import { parseGatesOutput, evidenceSummary, GATES } from '../worker/src/lib.js';
 
 const token = process.env.CLIENT_TOKEN;
 const repository = process.env.CLIENT_REPOSITORY;
@@ -23,7 +28,7 @@ const checkRunsJson = process.env.CHECK_RUNS;
 const mode = process.argv[2];
 
 if (!mode || !['start', 'report', 'setup-needed', 'sweep'].includes(mode)) {
-  console.error('usage: report-gates.mjs start|report <gates.log>|setup-needed|sweep');
+  console.error('usage: report-gates.mjs start|report <gates.log> [manifest.json]|setup-needed|sweep');
   process.exit(2);
 }
 for (const [name, value] of [
@@ -91,18 +96,39 @@ if (mode === 'start') {
   }
   const log = readFileSync(logPath, 'utf8');
   const results = parseGatesOutput(log);
-  // The whole log rides in each gate's summary (tail-limited): the client reads WHY a
-  // gate failed without ever needing access to our runner.
+
+  // The evidence manifest is optional on purpose. A bundle that failed to build must
+  // never cost the client their verdicts — the gates are the product, the summary is
+  // the record of them.
+  const manifestPath = process.argv[4];
+  let manifest = null;
+  if (manifestPath) {
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    } catch (cause) {
+      console.error(`report-gates: no evidence summary — ${cause.message}`);
+    }
+  }
+
+  // The whole log rides in each gate's `text` (tail-limited): the client reads WHY a
+  // gate failed without ever needing access to our runner. The evidence goes in
+  // `summary`, above it, because that is the half GitHub renders first and the half a
+  // reviewer without Actions access has no other way to reach.
   const tail = log.length > 6000 ? `…\n${log.slice(-6000)}` : log;
   for (const gate of GATES) {
     const result = results[gate];
     if (!result) continue; // silence is handled by sweep, loudly
+    const evidence = evidenceSummary(manifest, gate);
     await ghCheckRun(checkRuns[gate], 'PATCH', {
       status: 'completed',
       conclusion: result.conclusion,
-      output: { title: result.note.slice(0, 120) || result.conclusion, summary: `\`\`\`\n${tail}\n\`\`\`` },
+      output: {
+        title: result.note.slice(0, 120) || result.conclusion,
+        summary: evidence ?? `\`\`\`\n${tail}\n\`\`\``,
+        ...(evidence ? { text: `\`\`\`\n${tail}\n\`\`\`` } : {}),
+      },
     });
-    console.log(`report-gates: ${gate} → ${result.conclusion}`);
+    console.log(`report-gates: ${gate} → ${result.conclusion}${evidence ? ' (with evidence)' : ''}`);
   }
 } else if (mode === 'sweep') {
   for (const gate of GATES) {

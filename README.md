@@ -15,6 +15,9 @@ run by our engine, reported on their commit:
 Most projects publish adjectives; this app publishes numbers. Ordered by the Owner
 2026-08-27 (brief §4.5), built 2026-08-28.
 
+Every run also emits an **evidence bundle** — the file an auditor asks for, since a
+check run is five coloured rows that live only as long as GitHub keeps the page.
+
 ## Shape
 
 ```
@@ -22,6 +25,7 @@ engine/            the gate battery — byte-identical copies from verification-
   ci/gates.sh          ordered gates, runnable locally or in CI
   ci/digest-guard.sh   deployed-drift tripwire
   move-mutate/         systematic mutation testing
+  evidence/            the evidence bundle writer (originates here, not a copy)
 worker/            the front door — a Cloudflare Worker
   src/index.js         webhook receiver: verify signature → open check runs → dispatch
   src/lib.js           pure logic (crypto, routing, gate-output parsing) — unit tested
@@ -46,6 +50,60 @@ app/               REGISTRATION.md (the Owner's card) · app-manifest.json
    installs the pinned Sui CLI, runs `gates.sh`, and maps its output to per-gate
    verdicts. A sweep step turns any gate that never reported into an explicit failure:
    "never ran" must not read as "passed".
+4. The run writes an evidence bundle and uploads it as a workflow artifact. It is
+   written in an `always()` step, so a run that died half way through still leaves a
+   record naming the gates that never reported.
+
+## The evidence bundle
+
+`evidence/manifest.json` (machine) and `evidence/REPORT.md` (human) carry the same
+facts: repository, commit, package path, the git tree object of `engine/` at run time,
+the sui / python3 / OS versions, and every gate's verdict with the mutation counts —
+derivable, limit, derived, executed, killed, survived, excluded (broken down by the
+engine's own reason strings), skipped, and did-not-compile.
+
+Two rules govern it, and both are load-bearing:
+
+- **A count that was not measured is `null` with the reason beside it, never `0`.**
+  "Zero survivors" and "survivors not measured" are different facts about a contract,
+  and a document that renders them identically is worse than no document.
+- **A surviving mutation is an invariant no test exercises.** It is a gap in the test
+  suite, not a defect found in the contract. The report is checked by the test suite
+  against a list of words it may not contain, so no future edit can quietly promote a
+  survivor into a security finding.
+
+`bundleDigest` is sha256 over the canonicalised manifest with the `run` and
+`bundleDigest` keys removed. Everything volatile — the generation timestamp, the
+engine's start and finish times, workflow run identifiers, this repository's own HEAD,
+and absolute filesystem paths — lives under `run` and is excluded, because a digest
+that included them could never reproduce and so could never signal anything. Everything
+else is included: re-running the same commit on the same toolchain reproduces the
+digest, and a change to any verdict, count, toolchain version or to the engine tree
+changes it.
+
+### Where the evidence is visible
+
+The digest, the toolchain, the gate roll-up and the headline counts are written into
+**every check run's summary**, so a reviewer sees them on the pull request with no
+Actions permission and nothing to download. The full bundle stays attached to the
+runner workflow run as the artifact `evidence-<sha>`. The gate battery's log moves to
+the check run's `text`, below the evidence.
+
+The check-run summary is rendered in JavaScript (`evidenceSummary` in
+`worker/src/lib.js`) and the report in Python, so the list of words neither may say
+exists twice. `engine/test/test_evidence_bundle.py` reads the JavaScript mirror and
+fails if the two ever disagree.
+
+Build one locally from a finished gate run:
+
+```
+bash engine/ci/gates.sh <pkg> --mutation-limit 5 2>&1 | tee gates.log
+bash engine/move-mutate/move-mutate.sh <pkg> --list > derive.log 2>&1
+python3 engine/evidence/evidence_bundle.py --out evidence \
+  --repository owner/name --commit <sha> --package-path <pkg> \
+  --gates-log gates.log --mutation-report <pkg>/mutation-report.json \
+  --derive-log derive.log --mutation-limit 5
+```
 
 ## Security posture
 
@@ -81,7 +139,11 @@ guard, which refused to fake a kill).
 **Unit-verified:** 7 tests under `node --test` (webhook HMAC accept/reject/tamper,
 RS256 JWT checked against an independent implementation, PKCS#1 trap, routing,
 engine-output parsing); engine copies SHA-256-pinned via `engine/CHECKSUMS`,
-enforced by CI on every PR.
+enforced by CI on every PR. 31 tests under `python3 engine/test/test_evidence_bundle.py`
+for the evidence bundle: its counts checked against the shipped engine's live `--list`
+output and against a verbatim recorded gate run on the nested fixture, the digest proven
+stable across runs and proven to move when a result moves, and an unrun gate proven to
+serialise as null-with-reason rather than as zero.
 
 **Deliberately not built yet (road 2 — after the first service dollar):**
 billing/metering, multi-tenancy beyond this org, key-distance hardening for

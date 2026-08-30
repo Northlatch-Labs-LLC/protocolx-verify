@@ -140,3 +140,117 @@ export function parseGatesOutput(text) {
   }
   return results;
 }
+
+// Words the evidence summary may not contain.
+//
+// A surviving mutation is an invariant no test exercises. The moment a check run
+// reaches for security language it has made a claim the measurement does not
+// support, and it has made it in the most visible place we own — on the client's
+// own pull request.
+//
+// THIS LIST IS A MIRROR. The source of truth is FORBIDDEN_REPORT_TERMS in
+// engine/evidence/evidence_bundle.py; engine/test/test_evidence_bundle.py parses
+// this file and fails if the two ever disagree, so the copy cannot drift.
+export const FORBIDDEN_SUMMARY_TERMS = [
+  'vulnerabilit', 'exploit', 'severity', 'critical', 'cvss', 'cve-',
+  'high risk', 'attack vector', '0-day', 'zero-day',
+];
+
+// A count is an integer or it is absent. Absent renders as its reason, never as 0:
+// "0 survivors" and "survivors not measured" are different facts about a contract,
+// and the check run is the one place a reviewer will actually read them.
+function countOrReason(value, reason) {
+  if (typeof value === 'number') return String(value);
+  return `not measured (${reason || 'no reason recorded'})`;
+}
+
+function field(entry) {
+  if (!entry) return 'not recorded';
+  return entry.value || `not recorded — ${entry.reason ?? 'no reason recorded'}`;
+}
+
+// Render the evidence bundle into a check-run summary.
+//
+// WHY THIS EXISTS. The bundle is uploaded as a workflow artifact, and a workflow
+// artifact is visible only to someone with Actions access and only for as long as
+// the retention window. A reviewer on the pull request — the person the evidence is
+// FOR — may have neither. Putting the digest and the counts in the check run itself
+// makes the evidence readable by anyone who can see the pull request, with no
+// download and no extra permission. The full bundle stays the artifact; this is the
+// citable surface.
+//
+// Returns null when there is no manifest, and the caller falls back to the log
+// alone. A missing bundle must never cost a client their verdicts.
+export function evidenceSummary(manifest, gate) {
+  if (!manifest || typeof manifest !== 'object' || !manifest.gates) return null;
+  const sha = manifest.subject?.commitSha || '(commit not recorded)';
+  const L = [];
+  L.push('### ProtocolX Verify — evidence');
+  L.push('');
+  L.push(`Internal review of the code as committed at ${sha} — measured evidence, not an audit`);
+  L.push('');
+  L.push(`> ${manifest.independenceClause ?? ''}`);
+  L.push('');
+  L.push('| | |');
+  L.push('|---|---|');
+  L.push(`| bundle digest | \`${manifest.bundleDigest ?? 'not recorded'}\` |`);
+  L.push(`| engine tree | \`${field(manifest.engine?.treeSha)}\` |`);
+  L.push(`| sui | \`${field(manifest.toolchain?.sui)}\` |`);
+  L.push(`| python3 | \`${field(manifest.toolchain?.python3)}\` |`);
+  L.push(`| os | \`${field(manifest.toolchain?.os)}\` |`);
+  L.push('');
+
+  const roll = GATES.map((g) => `${g} **${manifest.gates[g]?.status ?? 'not recorded'}**`);
+  L.push(`**Gates** — ${roll.join(' · ')}`);
+  L.push('');
+
+  const smoke = manifest.gates['mutation-smoke'] ?? {};
+  const counts = smoke.counts;
+  if (!counts) {
+    L.push(`**Mutation smoke** — no counts. ${smoke.countsReason || 'no reason recorded'}`);
+    L.push('');
+  } else {
+    const u = counts.unavailable ?? {};
+    L.push('**Mutation smoke** — '
+      + `in package ${countOrReason(counts.derivable, u.derivable)}`
+      + ` · limit ${countOrReason(counts.limit, u.limit)}`
+      + ` · derived ${countOrReason(counts.derived, u.derived)}`
+      + ` · executed ${countOrReason(counts.executed, u.executed)}`
+      + ` · killed ${countOrReason(counts.killed, u.killed)}`
+      + ` · survived ${countOrReason(counts.survived, u.survived)}`
+      + ` · did not compile ${countOrReason(counts.invalidDidNotCompile, u.invalidDidNotCompile)}`
+      + ` · excluded ${countOrReason(counts.excluded?.total, u.excluded)}`
+      + ` · skipped ${countOrReason(counts.skipped?.total, u.skipped)}`);
+    L.push('');
+    // The reason breakdown goes only on the gate it belongs to. Repeating it on all
+    // five rows would bury the one verdict each row exists to deliver.
+    if (gate === 'mutation-smoke') {
+      const by = counts.excluded?.byReason;
+      if (by && Object.keys(by).length > 0) {
+        L.push('Excluded from derivation, by the engine\'s own reason:');
+        L.push('');
+        for (const reason of Object.keys(by).sort()) L.push(`- ${reason}: **${by[reason]}**`);
+        L.push('');
+      }
+      const sby = counts.skipped?.byReason;
+      if (sby && Object.keys(sby).length > 0) {
+        L.push('Skipped, by the engine\'s own reason:');
+        L.push('');
+        for (const reason of Object.keys(sby).sort()) L.push(`- ${reason}: **${sby[reason]}**`);
+        L.push('');
+      }
+      if (smoke.survivorMeaning) {
+        L.push(smoke.survivorMeaning);
+        L.push('');
+      }
+    }
+  }
+
+  L.push(manifest.absenceConvention ?? '');
+  L.push('');
+  L.push('The digest is sha256 over this run\'s manifest with its volatile fields '
+    + '(timestamps, workflow run identifiers, absolute paths) excluded, so re-running '
+    + 'the same commit on the same toolchain reproduces it. The full bundle — '
+    + '`manifest.json` and `REPORT.md` — is attached to the runner workflow run.');
+  return L.join('\n');
+}

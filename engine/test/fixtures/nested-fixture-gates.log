@@ -1,0 +1,23 @@
+── gate: build
+   build: PASS
+── gate: digest — skipped (no ci-expected-digest; not a deployed package)
+── gate: tests
+   tests: PASS
+── gate: pin — skipped (no check-framework-pin.sh)
+── gate: mutation-smoke
+=== move-mutate: nf ===
+derivation: legacy-line · operators: DEL · set sha256: d92a0c0654cdef9e
+derived 4 mutations, 0 multi-line skipped, 3 test-internal asserts excluded, 1 in-sources test files excluded
+checking baseline (sui move test)…
+baseline green. mutating.
+  SURVIVED  sources/market/model.move:7:DEL#0
+  SURVIVED  sources/obligation/access.move:7:DEL#0
+  SURVIVED  sources/obligation/access.move:11:DEL#0
+  SURVIVED  sources/obligation/access.move:12:DEL#0
+sources restored byte-identical
+
+executed: 4  killed: 0  survived: 4  invalid(no compile): 0
+reports: /private/tmp/claude-501/-Users-admin-WORK-CLAUDE/750ac67f-fd53-4550-9a3c-b8e60a0eb7ff/scratchpad/nf/MUTATION-REPORT.md · mutation-report.json · mutation-report.sarif
+   mutation-smoke: FAIL
+
+GATES FAILED

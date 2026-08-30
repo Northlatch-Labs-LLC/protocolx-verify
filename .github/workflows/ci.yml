@@ -41,6 +41,13 @@ jobs:
       - name: Mutation engine unit tests
         run: python3 engine/move-mutate/test/test_movemutate.py
 
+      - name: Evidence bundle unit tests
+        # The bundle is the document a buyer's auditor is handed. These prove its
+        # numbers are the engine's numbers, that its digest reproduces across runs and
+        # moves when a result moves, and that a gate which never ran serialises as
+        # null with a reason rather than as a zero.
+        run: python3 engine/test/test_evidence_bundle.py
+
       - name: Outcome classifier is not pipe-dependent
         # Guards a regression that inverted a real client result: classifying
         # killed-vs-did-not-compile through `echo | grep -q` under pipefail reports

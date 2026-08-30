@@ -4,5 +4,10 @@
 node_modules/
 .DS_Store
 gates.log
+derive.log
+# The bundle a local run writes at the repository root. Anchored with a leading
+# slash on purpose: an unanchored `evidence/` would also hide engine/evidence/,
+# which is the writer's source and must be committed.
+/evidence/
 __pycache__/
 *.pyc
