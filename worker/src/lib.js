@@ -183,6 +183,87 @@ export function sweepPlan(gatesLogText, unfinishedGates) {
   return plan;
 }
 
+// --- the evidence bundle's digest, recomputed independently -------------------
+//
+// A JavaScript mirror of the canonicalisation in engine/evidence/evidence_bundle.py.
+// It exists so the worker can VERIFY a manifest before storing or serving it, rather
+// than taking the `bundleDigest` field's word for it. A content-addressed store that
+// trusts the address it is handed is not content-addressed; it is a filing cabinet.
+//
+// The two implementations must agree byte for byte, so this reproduces Python's
+// `json.dumps(payload, sort_keys=True, separators=(",", ":"))` exactly, including its
+// ensure_ascii escaping. worker/test/lib.test.mjs proves the agreement against real
+// manifests written by the Python side, including ones stuffed with the characters
+// most likely to split the two — em dashes, quotes, backslashes, tabs, and emoji.
+export const DIGEST_EXCLUDED_TOP_LEVEL_KEYS = ['run', 'bundleDigest'];
+
+// Python escapes anything outside printable ASCII. JS strings are UTF-16, which is the
+// same unit Python's \uXXXX escaping emits for astral characters (as surrogate pairs),
+// so iterating code units here matches Python's output rather than fighting it.
+function canonicalString(s) {
+  let out = '"';
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    const code = s.charCodeAt(i);
+    if (ch === '"') out += '\\"';
+    else if (ch === '\\') out += '\\\\';
+    else if (code === 0x08) out += '\\b';
+    else if (code === 0x09) out += '\\t';
+    else if (code === 0x0a) out += '\\n';
+    else if (code === 0x0c) out += '\\f';
+    else if (code === 0x0d) out += '\\r';
+    else if (code < 0x20 || code > 0x7e) out += `\\u${code.toString(16).padStart(4, '0')}`;
+    else out += ch;
+  }
+  return `${out}"`;
+}
+
+export function canonicalJson(value) {
+  if (value === null) return 'null';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'number') {
+    // Integers only, and the refusal is deliberate. Python's repr of a float and
+    // JavaScript's are not the same string for every value, so a float would make the
+    // two digests disagree for reasons no reader could ever diagnose. The manifest
+    // contains only integer counts; if that ever changes, this must be solved before
+    // the change ships, not after.
+    if (!Number.isInteger(value)) {
+      throw new Error('canonicalJson: non-integer number — Python and JavaScript do not '
+        + 'format floats identically, so the digest could not be reproduced across them');
+    }
+    return String(value);
+  }
+  if (typeof value === 'string') return canonicalString(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    for (const k of keys) {
+      // Python sorts by code point; JavaScript's default sort is by UTF-16 code unit.
+      // They differ above the BMP. Restricting keys to printable ASCII — which every
+      // key in this manifest is — makes the two orderings identical by construction
+      // instead of by hope.
+      if (/[^\x20-\x7e]/.test(k)) {
+        throw new Error(`canonicalJson: non-ASCII object key ${JSON.stringify(k)} — key `
+          + 'ordering would not match the Python canonicalisation');
+      }
+    }
+    return `{${keys.map((k) => `${canonicalString(k)}:${canonicalJson(value[k])}`).join(',')}}`;
+  }
+  throw new Error(`canonicalJson: cannot serialise ${typeof value}`);
+}
+
+export async function canonicalDigest(manifest) {
+  const payload = {};
+  for (const key of Object.keys(manifest)) {
+    if (!DIGEST_EXCLUDED_TOP_LEVEL_KEYS.includes(key)) payload[key] = manifest[key];
+  }
+  const bytes = te.encode(canonicalJson(payload));
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  let hex = '';
+  for (const b of hash) hex += b.toString(16).padStart(2, '0');
+  return `sha256:${hex}`;
+}
+
 // Words the evidence summary may not contain.
 //
 // A surviving mutation is an invariant no test exercises. The moment a check run

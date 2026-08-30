@@ -46,6 +46,14 @@ jobs:
         # and /usage serves nobody when its secret is unset.
         run: node --test worker/test/ledger.test.mjs
 
+      - name: Evidence store and cross-language digest
+        # The bundle's digest is computed in Python and re-computed in JavaScript. If
+        # the two ever disagree the content-addressed store rejects real bundles, so
+        # these hash manifests the Python writer actually produced — including ones
+        # stuffed with the characters most likely to split the two implementations.
+        # Also proves the permalink stays inert and that it cannot shadow /usage.
+        run: node --test worker/test/evidence-store.test.mjs
+
       - name: Mutation engine unit tests
         run: python3 engine/move-mutate/test/test_movemutate.py
 
@@ -92,6 +100,7 @@ jobs:
           node --check runner/mint-token.mjs
           node --check runner/report-gates.mjs
           node --check runner/test/wiring.test.mjs
+          node --check worker/test/evidence-store.test.mjs
 
       - name: Every module the worker imports is actually deployed
         # scripts/deploy.sh uploads an explicit module list to the Cloudflare API. A new
