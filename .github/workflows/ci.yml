@@ -121,6 +121,8 @@ jobs:
           node --check worker/test/evidence-store.test.mjs
 
           node --check runner/test/preflight.test.mjs
+          node --check action/resolve-package.mjs
+          node --check action/summary.mjs
 
       - name: Every module the worker imports is actually deployed
         # scripts/deploy.sh uploads an explicit module list to the Cloudflare API. A new

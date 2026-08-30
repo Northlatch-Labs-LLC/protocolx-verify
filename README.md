@@ -18,6 +18,108 @@ Most projects publish adjectives; this app publishes numbers. Ordered by the Own
 Every run also emits an **evidence bundle** — the file an auditor asks for, since a
 check run is five coloured rows that live only as long as GitHub keeps the page.
 
+## The GitHub Action — the same gates, in your own CI
+
+The App is the convenience path; the composite Action at this repository's root is
+the **zero-trust path**. It runs on your runner, inside your job: no GitHub App to
+install, no permission grant, no token of yours or ours changes hands, and nothing is
+transmitted anywhere — there is no telemetry. If you read permission scopes for a
+living, this is the door built for you.
+
+```yaml
+# .github/workflows/protocolx-verify.yml
+name: ProtocolX Verify
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Northlatch-Labs-LLC/protocolx-verify@v1
+```
+
+That is the whole install on most repositories. The action finds your Move package on
+its own — `.protocolx-verify.json` first (the same file the App reads), then a
+`Move.toml` at the repository root, then a single nested `Move.toml`. A monorepo with
+several packages sets the `package` input explicitly; the action refuses to guess
+between candidates, because verifying the wrong contract and calling it evidence
+would be worse than asking.
+
+A copy-ready workflow lives at [`examples/protocolx-verify.yml`](examples/protocolx-verify.yml).
+
+### Inputs
+
+| input | default | meaning |
+|---|---|---|
+| `package` | auto-detected | path of the Move package, relative to the repository root |
+| `mutation-limit` | `5` | mutations executed per run — each one costs a full test-suite run |
+| `sui-version` | `mainnet-v1.77.2` | pinned Sui CLI; a floating toolchain changes what compiles without a line of your repository changing |
+| `python-version` | `3.11` | pinned Python for the mutation engine |
+| `upload-evidence` | `true` | attach the evidence bundle (`manifest.json`, `REPORT.md`) as a workflow artifact |
+
+Outputs: `verdicts` (JSON map of gate → `pass` / `fail` / `skipped` / `never-reported`),
+`bundle-digest`, and `survived`.
+
+### What a run gives you
+
+The five gates run through the same engine the App ships — not a port, the same
+files — and the job's step summary carries the five verdicts, the mutation line
+(`executed · killed · survived · invalid`), and the evidence bundle's reproducible
+digest. The action fails the job if any gate fails **or never reported**: silence
+must not read as a pass. A gate that does not apply to your repository — no
+`ci-expected-digest`, no `scripts/check-framework-pin.sh` — is reported *skipped*,
+never silently passed.
+
+The same discipline the App enforces holds here, because it is the same code:
+
+- **Your code runs sandboxed on your own runner.** Client-executing steps go through
+  `runner/sandbox.sh` — an `env -i` allowlist under a dedicated unprivileged uid, in
+  a staged tree that carries none of your job's environment. Your workflow's secrets
+  are invisible to the code under test, including your own checkout token
+  (`.git` is excluded from the staged tree). If the privilege drop cannot be made,
+  the run fails; it does not fall back.
+- **The tripwire.** Every file the action ships is hashed before your code is staged
+  and re-hashed after it has run. If anything under `runner/`, `worker/`, `engine/`
+  or `action/` changed in between, no verdict is posted.
+- **The engine self-test runs first.** Before touching your code, the mutation engine
+  must derive mutations from its own nested-package fixture. If it cannot, the run
+  fails and the error says the fault is ours, not yours.
+- **The evidence bundle degrades gracefully.** If the bundle cannot be written, the
+  gate verdicts still stand — they simply carry no digest, and the summary says so.
+
+What the action does **not** do, said plainly: it does not filter outbound network
+traffic from the sandbox, and five gates are **measured evidence, not an audit** —
+nothing here certifies a contract secure.
+
+### Requirements
+
+A Linux runner with passwordless sudo — GitHub's hosted `ubuntu-latest` has both. The
+sandbox's privilege drop is mandatory (`PVS_SANDBOX_REQUIRED=1`); a runner that
+cannot provide it gets a refusal, not a degraded run.
+
+### Pricing
+
+Free forever on one public repository per organisation. $149/repository/month beyond
+that (annual $1,490) — the action does not meter, phone home, or enforce; the terms
+are stated here and in the run summary, and honoured on the honour system. Contact:
+kaela@projectxprotocol.dev.
+
+### App or Action?
+
+| | GitHub App | GitHub Action |
+|---|---|---|
+| install | grant the App on the repo | copy one workflow file |
+| where it runs | our runner | your runner, your CI minutes |
+| token flow | short-lived installation token, held by our credentialed steps only | none — no token of yours or ours changes hands |
+| verdicts land as | five check runs on the commit | job status + step summary |
+| evidence bundle | artifact on our runner's workflow run | artifact on your own workflow run |
+| best for | teams that want zero CI wiring | teams that read permission scopes before granting them |
+
 ## Shape
 
 ```
@@ -41,6 +143,10 @@ runner/            mint-token.mjs (App JWT → installation token) · report-gat
   test/                preflight.test.mjs · secret-distance.sh · workflow-audit.py
 scripts/           deploy.sh (API deploy, no wrangler) · set-worker-secret.sh
 app/               REGISTRATION.md (the Owner's card) · app-manifest.json
+action.yml         the composite GitHub Action — same engine, run in the client's CI
+action/            resolve-package.mjs (zero-config package discovery) · summary.mjs
+                   (step summary, outputs, and the verdict exit code)
+examples/          protocolx-verify.yml — the workflow a client copies
 ```
 
 ## How a run flows

