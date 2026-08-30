@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\
-# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
 """
 apply — write one mutation into one file.
 

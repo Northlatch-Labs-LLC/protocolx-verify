@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\
-# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
 #
 # move-mutate — systematic mutation testing for any Sui Move package.
 #
@@ -46,7 +45,7 @@
 #
 # PARALLELISM, AND WHY IT NEEDS ITS OWN MOVE CACHE. `sui move test` takes a lock on
 # the shared Move package cache (MOVE_HOME, default ~/.move), so concurrent runs
-# serialise completely: measured here, four concurrent runs against four
+# serialise completely: measured on this estate, four concurrent runs against four
 # separate package copies took 32.0s versus 8.3s for one — exactly 4x, no gain at all.
 # Giving each worker its own MOVE_HOME (an APFS clone of the cache, so it costs
 # metadata rather than gigabytes) took the same four runs to 10.4s at 484% CPU. The
@@ -68,7 +67,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "  no pip packages). Install python3 and re-run. See README.md." >&2
   exit 2
 fi
-for f in movelex.py operators.py derive.py apply.py report.py; do
+for f in movelex.py operators.py derive.py apply.py report.py shadow.py; do
   [[ -f "$LIB/$f" ]] || { echo "move-mutate: missing library file $LIB/$f" >&2; exit 2; }
 done
 
@@ -343,6 +342,7 @@ for m in d['mutations']:
         'id': m['id'], 'file': m['file'], 'line': m['line'],
         'rule_id': m['rule_id'], 'original': m['original'],
         'outcome': o, 'proposals': m.get('proposals', []),
+        'shadow': m.get('shadow', {}),
     })
 manifest = {
     'package': d['package'],

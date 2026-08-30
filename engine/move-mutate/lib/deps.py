@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\
-# Co-authored-by: Kaela <kaela@projectxprotocol.dev>
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
 """
 deps — find the smallest directory tree that contains a package AND every
 local dependency it needs to build.
