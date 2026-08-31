@@ -2,16 +2,16 @@
 # The engine below is a downstream artifact of verification-tools,
 # which is canonical. See verification-tools/CANONICAL.md.
 source_repo: verification-tools
-source_commit: 8a4421977de502009b5ec555cc46740b3855597c
-source_dirty_files: 0
+source_commit: 5cddcbf033925bf3a9729eaa5a535160115dde11
+source_dirty_files: 1
 engine_files: 8
 loader_modules: apply.py derive.py movelex.py operators.py report.py shadow.py 
 --- sha256 ---
-dd5750ad22a79be380c05d78c34bf6443e92d2944f0301050fb2d08481f3e0b8  engine/move-mutate/move-mutate.sh
-f8f808280dd9b26f026c46d478f0b4770f8293dda1ad73ea7d09b032fe939b6c  engine/move-mutate/lib/apply.py
-2bcf961b032ce620c12290481b181dd40448be13d3d14ad66da2315a8ebb5215  engine/move-mutate/lib/deps.py
-3ffe5efd278c89fe4e2fc16c8478c0fae40496472b16a610ea2826f142c311a8  engine/move-mutate/lib/derive.py
-d45385422b4b89c3144b40694e8eee9196ef53dda3fafbde5246146665b850c8  engine/move-mutate/lib/movelex.py
-48218448aadeac1b504ede7b64547c9565585f7fb1029c38cc2ed87a5f21b2e0  engine/move-mutate/lib/operators.py
-b6f03c4854ee52faab2d9203981583a1a01c43d7d914ef170d32aacdac4cc5c9  engine/move-mutate/lib/report.py
-ae2868e7cbd6246a59dfaea3e621919e883768352eb3e9b86047bcf705c93b34  engine/move-mutate/lib/shadow.py
+426eb9f2eecefc1b7226bf6724626db099b0b7d0a329a1bad1d419687046f332  engine/move-mutate/move-mutate.sh
+de1cb74b98d4b2005f5e283778d7b26c5e99f1e2aed9ff43572bb4320e9c997d  engine/move-mutate/lib/apply.py
+75f979fd379f7185daf196ebaeb69d940e43c658785cb10a77c475212d5968ad  engine/move-mutate/lib/deps.py
+eac556441d4c7b91423f8a2e53967fd29e1a68f97749b2e70a8cb3e7a9bcc387  engine/move-mutate/lib/derive.py
+11bc0846ca7e4b7013da638f26a1565122ede5dfbab97473e4da7d8e17c7f24c  engine/move-mutate/lib/movelex.py
+232979508f5ec0309495fc8658ac9a01475f3081f4fb0e042dc0a61803ef4d17  engine/move-mutate/lib/operators.py
+121752106081abe165236ebf1de58ffc0e7004175d50dd80d70e6a1409addf44  engine/move-mutate/lib/report.py
+ce751277f7a2dbea900550162657d7dca4f33a41f334523231ab1c012ab59641  engine/move-mutate/lib/shadow.py
