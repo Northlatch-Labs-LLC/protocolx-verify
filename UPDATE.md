@@ -12,6 +12,14 @@ superseded.
 
 ---
 
+## 2026-08-31 · Currency note: main has advanced past the entry below (PR #17 merged)
+
+**Who:** desk audit (read-only verification) · **Where:** main at `67014a3` · **Ref:** PR #17
+
+Recording main's advance so the newest entry matches HEAD: the shipped engine is marked as generated with a refreshed checksum manifest, the README states at the top which of the three verify repos this is, and engine banners are generated (PR #17, `engine-generated-banners`). No findings — purely a currency note from the 2026-08-31 estate audit.
+
+---
+
 ## 2026-08-30 · Publishable tree, BUSL-1.1, and a drift gate between the shipped and internal engines
 
 **Who:** engineering desk · **Where:** repository root, `engine/`, `.github/workflows/ci.yml` · **Ref:** PR #10 merged, main at `f94710f`
