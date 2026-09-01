@@ -122,6 +122,19 @@ jobs:
         # the module loader agrees with the modules actually shipped.
         run: bash engine/test/engine-drift.sh
 
+      - name: A digest that cannot be read is not a digest that disagreed
+        # The defect this guards, observed on weir PR #88: the digest gate published
+        # `fail` — which this product defines as the source no longer building to the
+        # deployed package — for a pull request that changed no Move source at all.
+        # The build had produced an empty dump, `json.load` raised inside a pipeline,
+        # and a failed READ was reported as a failed MEASUREMENT. The next push, on
+        # byte-identical source, passed.
+        #
+        # A gate that is flaky is worse than a gate that is absent: an absent gate is
+        # known to be absent, and a flaky one teaches the reader to push again and
+        # watch it go green. That is the opposite of what this product is for.
+        run: bash engine/test/digest-reader.sh
+
       - name: The shipped engine measures a nested package
         # The defect this guards: a flat `sources/*.move` glob derives ZERO mutations
         # from any package that nests its modules, so our own product reports
