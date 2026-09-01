@@ -585,7 +585,7 @@ Nothing a client's code writes survives to the next client's run.
 
 **Verified live, in production:** the full loop ran end to end on 2026-08-29 —
 GitHub delivery → signature verification at the deployed worker
-(protocolx-verify.$CF_WORKERS_SUBDOMAIN.workers.dev) → five check runs on the client commit →
+(verify.projectxprotocol.dev) → five check runs on the client commit →
 runner dispatch → client repo fetched at the exact sha with a short-lived
 installation token → gate battery → per-gate verdicts posted back. First client:
 `weir` (our own mainnet SocialFi contract). First complete run surfaced two
