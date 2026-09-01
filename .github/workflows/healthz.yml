@@ -23,8 +23,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Knock
+        env:
+          HEALTHZ_URL: ${{ vars.WORKER_HEALTHZ_URL }}
         run: |
-          BODY=$(curl -sS --max-time 15 https://protocolx-verify.primo9537.workers.dev/healthz) || {
+          # The host lives in a repository variable, not in this file. This repository is on a
+          # publication path, and a workers.dev subdomain is derived from the account holder's
+          # own identifier — the same reason REGISTRATION.md keeps CF_ACCOUNT_ID a placeholder.
+          # Fail loudly rather than silently skipping if the variable is unset: a health check
+          # that quietly passes when it checked nothing is worse than no health check.
+          [ -n "${HEALTHZ_URL:-}" ] || { echo "WORKER_HEALTHZ_URL is not set on this repository"; exit 1; }
+          BODY=$(curl -sS --max-time 15 "$HEALTHZ_URL") || {
             echo "THE FRONT DOOR DID NOT ANSWER AT ALL"; exit 1; }
           echo "$BODY"
           echo "$BODY" | grep -q '"ok":true' || {
