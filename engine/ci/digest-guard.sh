@@ -24,6 +24,38 @@ cd "$PKG"
 
 EXPECTED="$(cat ci-expected-digest | tr -d '[:space:]')"
 
+# ------------------------------------------------------------------------------------------------
+# Which compiler produced the expectation.
+#
+# A package digest is a function of the SOURCE and the COMPILER. Only the source is versioned in
+# git. `ci-expected-digest` is a bare hash: it records neither the toolchain that produced it nor
+# the fact that it depends on one.
+#
+# The estate already holds that fact one file away. `Published.toml` carries `toolchain-version`
+# beside the published `version`, written when the package was published. This reads it.
+#
+# Nothing here changes what PASSES or FAILS. It changes what a failure is allowed to SAY. A gate
+# whose job is to accuse somebody's source of drifting must not make that accusation when the only
+# thing that moved was the compiler — and it cannot know which it is looking at unless it asks.
+#
+# Absent on either side, the comparison is skipped and said to be skipped. An unmeasured fact is
+# reported as unmeasured, never as agreement: that is the same rule the build and read failures
+# above already follow, and the reason this gate exits 2 rather than 1 when it cannot measure.
+# ------------------------------------------------------------------------------------------------
+RECORDED_TOOLCHAIN=""
+if [[ -f Published.toml ]]; then
+  RECORDED_TOOLCHAIN="$(sed -n 's/^[[:space:]]*toolchain-version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' Published.toml | head -1)"
+fi
+
+RUNNING_TOOLCHAIN=""
+if command -v sui >/dev/null 2>&1; then
+  # `sui --version` prints e.g. "sui 1.77.2-51d177ad7d65"; Published.toml records "1.77.2".
+  RUNNING_TOOLCHAIN="$(sui --version 2>/dev/null | awk '{print $2}' | cut -d- -f1)"
+fi
+
+source "$SCRIPT_DIR/toolchain-note.sh"
+
+
 # Build on its own, with the compiler's stderr VISIBLE, into a file.
 #
 # This was a single pipeline ending `2>/dev/null | python3 -c "… json.load …"`, and it had three
@@ -64,12 +96,19 @@ fi
 
 if [[ "$ACTUAL" == "$EXPECTED" ]]; then
   echo "digest-guard: OK ($ACTUAL)"
+  # Stated on success too. A match produced by a compiler nobody compared is a weaker fact than a
+  # match produced by the recorded one, and the report should not present them as the same.
+  toolchain_note match
 else
   echo "digest-guard: MISMATCH"
   echo "  expected: $EXPECTED"
   echo "  actual:   $ACTUAL"
-  echo "The source no longer builds to the recorded package. If this change is a deliberate"
-  echo "upgrade, update ci-expected-digest in the same commit and say so; otherwise the source"
-  echo "has drifted from the deployed contract and this failure is doing its job."
+  toolchain_note mismatch
+  echo "This build does not match the recorded package. If the compiler above is the recorded one,"
+  echo "the source has drifted from the deployed contract and this failure is doing its job. If it"
+  echo "is not, establish which moved before concluding anything. A deliberate upgrade updates"
+  echo "ci-expected-digest in the same commit and says so; a compiler change is not that, and"
+  echo "updating the expectation to match a different compiler records agreement without"
+  echo "establishing it."
   exit 1
 fi
