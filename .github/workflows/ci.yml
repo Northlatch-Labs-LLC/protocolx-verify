@@ -134,6 +134,10 @@ jobs:
         # known to be absent, and a flaky one teaches the reader to push again and
         # watch it go green. That is the opposite of what this product is for.
         run: bash engine/test/digest-reader.sh
+      # The comparison on its own, without a compiler: deployed match, intended (next) match,
+      # nothing else — and it must name which file it matched.
+      - name: The digest comparison accepts exactly the deployed and the intended digest
+        run: bash engine/test/digest-compare.sh
 
       - name: A digest verdict does not accuse the source when the compiler moved
         run: bash engine/test/toolchain-note.sh

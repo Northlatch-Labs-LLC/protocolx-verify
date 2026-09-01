@@ -2,16 +2,24 @@
 # The engine below is a downstream artifact of verification-tools,
 # which is canonical. See verification-tools/CANONICAL.md.
 source_repo: verification-tools
-source_commit: 5cddcbf033925bf3a9729eaa5a535160115dde11
-source_dirty_files: 1
+source_commit: 095fd383d981aee15ad3a49ab9d2683c511eb366
+source_dirty_files: 0
 engine_files: 8
 loader_modules: apply.py derive.py movelex.py operators.py report.py shadow.py 
 --- sha256 ---
-426eb9f2eecefc1b7226bf6724626db099b0b7d0a329a1bad1d419687046f332  engine/move-mutate/move-mutate.sh
-de1cb74b98d4b2005f5e283778d7b26c5e99f1e2aed9ff43572bb4320e9c997d  engine/move-mutate/lib/apply.py
-75f979fd379f7185daf196ebaeb69d940e43c658785cb10a77c475212d5968ad  engine/move-mutate/lib/deps.py
-eac556441d4c7b91423f8a2e53967fd29e1a68f97749b2e70a8cb3e7a9bcc387  engine/move-mutate/lib/derive.py
-11bc0846ca7e4b7013da638f26a1565122ede5dfbab97473e4da7d8e17c7f24c  engine/move-mutate/lib/movelex.py
-232979508f5ec0309495fc8658ac9a01475f3081f4fb0e042dc0a61803ef4d17  engine/move-mutate/lib/operators.py
-121752106081abe165236ebf1de58ffc0e7004175d50dd80d70e6a1409addf44  engine/move-mutate/lib/report.py
-ce751277f7a2dbea900550162657d7dca4f33a41f334523231ab1c012ab59641  engine/move-mutate/lib/shadow.py
+9000c9866468eb05f1dac290db24e9a0b3aa7ce84430b347d71489e99feab75f  engine/move-mutate/move-mutate.sh
+d556ee3fa266ceaf235718cb47aa81143930e3a5ddde4d1c5d7482fd1a093135  engine/move-mutate/lib/apply.py
+634006f490fccabfd3a03d3ea12fe738823a3c72b1596822aed83207ef91c8cf  engine/move-mutate/lib/deps.py
+6e49817b93eb64fb049ea5abf8f08e4b423cec08ac28fcbedd1a508230d78efe  engine/move-mutate/lib/derive.py
+ff9bed18760254defa206fc3fbda1d4ab88658dcaa26a2838dd24574c56d9b7e  engine/move-mutate/lib/movelex.py
+9c76cdfbb1a58dfa5428b57a179cb06c8adac2cdd3a71f8af17da5a454fc325e  engine/move-mutate/lib/operators.py
+5f4e229a0d36cf498b24c58bc9efca406d40f6e83882d8c6e3a7a11f31eb3bd7  engine/move-mutate/lib/report.py
+560f1a757815219e2adf303be77efaf7938ba4496b9ac23b198523da10132979  engine/move-mutate/lib/shadow.py
+753d0b58a3f8e0997da2252f485111b86c36beae29fd9b08444c5cd5639913f4  engine/ci/digest-compare.sh
+0b9c37aaa8dc67f2ef1231f6f82777dd361b18c13551fa5394adbd0b1cf751e2  engine/ci/digest-guard.sh
+9d21727cf4f8b724983b410d4e6e23362556341d354b165bdaaa9ce18ce93857  engine/ci/digest-of-dump.py
+8233f4caa7ccd49211403b4ccf5e01218f943b3958b6c869ff241ce5278c7a2f  engine/ci/gates.sh
+57baf35c928f78a4ba1eb44b8176d26fe67d3978e434a230ec395619a7909fad  engine/ci/toolchain-note.sh
+32d25301e343740bb100eb553326562a34cc2209208dbb4d6f6bfbae843e2806  engine/test/digest-compare.sh
+dbfaa11d999beca8eef3da0487dd1ee1d08e40e45a1cc953bfc05ec04eecdbd4  engine/test/digest-reader.sh
+dc0a673b02abbcdfee953ab06ec22a120688ec5fc251ae69bdd5a28e698ca127  engine/test/toolchain-note.sh

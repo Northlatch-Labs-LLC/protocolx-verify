@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+# GENERATED FILE — DO NOT EDIT. Downstream artifact of verification-tools.
+# Edit the canonical copy there, then run sync-engine.sh. Edits here are lost
+# on the next sync and cause the engine to differ from the tree it claims.
+# source_commit: 095fd383d981aee15ad3a49ab9d2683c511eb366
+# ─────────────────────────────────────────────────────────────────────────────
 # Built-by: @projectx.sui /|\
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
@@ -23,6 +29,10 @@ cd "$PKG"
 [[ -f ci-expected-digest ]] || { echo "no ci-expected-digest in $PKG — record one first:"; echo "  (build digest) > ci-expected-digest"; exit 2; }
 
 EXPECTED="$(cat ci-expected-digest | tr -d '[:space:]')"
+# The intended digest, present only on an upgrade branch. See digest-compare.sh for why a second
+# file rather than an edit to the first.
+NEXT=""
+[[ -f ci-next-digest ]] && NEXT="$(cat ci-next-digest | tr -d '[:space:]')"
 
 # ------------------------------------------------------------------------------------------------
 # Which compiler produced the expectation.
@@ -94,20 +104,17 @@ if ! ACTUAL="$(python3 "$SCRIPT_DIR/digest-of-dump.py" "$DUMP")"; then
   exit 2
 fi
 
-if [[ "$ACTUAL" == "$EXPECTED" ]]; then
-  echo "digest-guard: OK ($ACTUAL)"
+if "$SCRIPT_DIR/digest-compare.sh" "$ACTUAL" "$EXPECTED" "$NEXT"; then
   # Stated on success too. A match produced by a compiler nobody compared is a weaker fact than a
   # match produced by the recorded one, and the report should not present them as the same.
   toolchain_note match
 else
-  echo "digest-guard: MISMATCH"
-  echo "  expected: $EXPECTED"
-  echo "  actual:   $ACTUAL"
   toolchain_note mismatch
   echo "This build does not match the recorded package. If the compiler above is the recorded one,"
   echo "the source has drifted from the deployed contract and this failure is doing its job. If it"
-  echo "is not, establish which moved before concluding anything. A deliberate upgrade updates"
-  echo "ci-expected-digest in the same commit and says so; a compiler change is not that, and"
+  echo "is not, establish which moved before concluding anything. A deliberate upgrade records the"
+  echo "built digest in ci-next-digest in the same commit (and promotes it into ci-expected-digest"
+  echo "in the ceremony commit); a compiler change is not that, and"
   echo "updating the expectation to match a different compiler records agreement without"
   echo "establishing it."
   exit 1

@@ -3,7 +3,7 @@
 # GENERATED FILE — DO NOT EDIT. Downstream artifact of verification-tools.
 # Edit the canonical copy there, then run sync-engine.sh. Edits here are lost
 # on the next sync and cause the engine to differ from the tree it claims.
-# source_commit: 5cddcbf033925bf3a9729eaa5a535160115dde11
+# source_commit: 095fd383d981aee15ad3a49ab9d2683c511eb366
 # ─────────────────────────────────────────────────────────────────────────────
 # Built-by: @projectx.sui /|\ · Co-authored-by: Claude
 """
