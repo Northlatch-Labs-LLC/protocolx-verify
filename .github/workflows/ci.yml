@@ -135,6 +135,9 @@ jobs:
         # watch it go green. That is the opposite of what this product is for.
         run: bash engine/test/digest-reader.sh
 
+      - name: A digest verdict does not accuse the source when the compiler moved
+        run: bash engine/test/toolchain-note.sh
+
       - name: The shipped engine measures a nested package
         # The defect this guards: a flat `sources/*.move` glob derives ZERO mutations
         # from any package that nests its modules, so our own product reports
