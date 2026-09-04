@@ -12,6 +12,16 @@ superseded.
 
 ---
 
+## 2026-09-03 · Gate run on this laptop, recorded in the estate ledger; main at `2ade54f`, clean
+
+**Who:** engineering agent on the chief technology officer's dispatch · **Where:** `main` at `2ade54f`, 0 dirty files, `main...origin/main` per the local ref (not fetched) · **Ref:** `work/state/gate-runs.json` id `protocolx-verify`; report `work/reports/2026-09-03-engineering-gates-for-every-solution.md`
+
+The 22 steps of `.github/workflows/ci.yml` (job `Self-gates`) were run here in the same order, 19 seconds in all, every step exit 0: the worker's lib, ledger and evidence-store tests; preflight; `secret-distance: 9 passed, 0 failed`; the mutation engine's `Ran 50 tests … OK`; gates-output mirror; `TRIPWIRE OK — 7 checks. It trips in a worker-less tree`; runner wiring; evidence bundle; `CLASSIFIER OK`; engine-drift; digest-reader OK; `digest-compare: all checks passed`; toolchain-note; app-path `12/12 checks passed`; every shell, JS and Python entrypoint parses; `deploy.sh uploads index.js / lib.js / ledger.js: OK`; `sha256sum -c engine/CHECKSUMS` all OK; manifest valid JSON, workflows readable.
+
+**Result: pass.** This is the repository's own gate on itself; no client package was measured.
+
+---
+
 ## 2026-08-31 · Currency note: main has advanced past the entry below (PR #17 merged)
 
 **Who:** desk audit (read-only verification) · **Where:** main at `67014a3` · **Ref:** PR #17
