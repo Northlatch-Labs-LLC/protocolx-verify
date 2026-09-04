@@ -11,3 +11,9 @@ derive.log
 /evidence/
 __pycache__/
 *.pyc
+
+# security/eyes-only -- preventive hardening staged 2026-09-04 (estate security sweep, Master order
+# 2026-09-04). No file matching these was found tracked at sweep time; this refuses one by path
+# before it can ever be staged again. See work/reports/2026-09-04-security-eyes-only-on-github.md.
+/work/
+/operations/
