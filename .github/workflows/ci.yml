@@ -98,6 +98,14 @@ jobs:
         # measurement. Nothing in the repository would have caught that regression.
         run: node --test runner/test/wiring.test.mjs
 
+      - name: The published offer agrees with the published licence
+        # The offer copy has contradicted the licence twice. Once outright — the App's
+        # per-repository price applied to the Action, which BUSL-1.1's Additional Use
+        # Grant makes false — and once by placement: the free grant was true, published
+        # and correct, and sat in prose below an offer table showing two prices and no
+        # free row. Both are invisible to every other check here.
+        run: node --test runner/test/offer-copy.test.mjs
+
       - name: Evidence bundle unit tests
         # The bundle is the document an auditor is handed. These prove its
         # numbers are the engine's numbers, that its digest reproduces across runs and
@@ -168,6 +176,7 @@ jobs:
           node --check runner/preflight.mjs
           node --check runner/lib/preflight.mjs
           node --check runner/test/wiring.test.mjs
+          node --check runner/test/offer-copy.test.mjs
           node --check worker/test/evidence-store.test.mjs
 
           node --check runner/test/preflight.test.mjs

@@ -12,6 +12,12 @@ Five verification gates for Sui Move packages, run inside your own CI: **build**
 **deployed-digest guard**, **tests**, **framework pin**, **mutation smoke**. Every run
 leaves an evidence bundle with a reproducible digest.
 
+**Running it yourself is free, on public and private repositories alike.** The licence
+grants you production use in your own CI against your own code, with nothing to sign,
+nothing metered and nothing transmitted to us. That is not a trial and it does not
+expire. The paid things at the bottom of this page exist only for teams who would rather
+we ran it.
+
 ---
 
 ## Read this first: a red `mutation-smoke` is the tool working
@@ -203,12 +209,21 @@ Licensor: Northlatch Labs LLC. Licensing enquiries: kaela@projectxprotocol.dev
 ## If you would rather we ran it
 
 Nothing below is required to use this action. It exists because some teams want the
-measurement without owning the pipeline.
+measurement without owning the pipeline. The first row is the one most readers want, and
+it is on this table rather than buried in the licence so that nobody has to take our word
+for which of the three they are in.
 
 | | |
 |---|---|
+| **The Action, in your own CI** — all five gates, the same engine, the same evidence bundle, on as many repositories as you like, public or private | **free**, and not a trial |
 | **First Report** — one Move package, all five gates, evidence bundle with a reproducible digest, delivered in 24 hours | **$1,000**, once |
 | **The App** — the same gates on every pull request, run and hosted by us | **$149 / repository / month** (annual $1,490) |
+
+The free row is the Additional Use Grant in the [licence](#licence), not a discount we
+can withdraw: it is a term of BUSL-1.1 as published, and on 2030-08-30 the whole thing
+converts to Apache-2.0 regardless. What the two paid rows buy is somebody else running
+it — the pipeline, the runner, the report — and not a gate you would otherwise be
+missing.
 
 Contact: kaela@projectxprotocol.dev
 
