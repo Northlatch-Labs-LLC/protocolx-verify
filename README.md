@@ -53,6 +53,13 @@ So the two things worth saying plainly, before you read another line:
 The other four gates are conventional and mostly go green. This is the one that tells
 you something you did not already know.
 
+**And it runs whether or not anyone remembers to run it.** Mutation testing for Move is
+not ours alone — it exists as a command you can install and invoke. The difference here
+is where it lives: this one runs on every pull request, inside the CI you already have,
+and reports the counts as a check run beside the others. A command measures your suite on
+the day somebody thinks to type it. A gate measures it on the day the suite gets worse,
+which is the only day the number matters.
+
 ---
 
 ## Install

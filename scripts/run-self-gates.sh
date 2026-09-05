@@ -2,7 +2,7 @@
 # Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
-# Reruns, on this laptop, the same 23 steps that .github/workflows/ci.yml runs in the job
+# Reruns, on this laptop, the same 24 steps that .github/workflows/ci.yml runs in the job
 # named "Self-gates" — in the same order, with the same strictness. This tool measures gates
 # for a living; a version of it that only measures OTHER repositories' gates is not credible,
 # so it gates itself too, on demand rather than only in the cloud.
@@ -75,92 +75,97 @@ trap on_exit EXIT
 
 started=$(date +%s)
 
-# --- Step 1 -----------------------------------------------------------------------------------
+# --- Step 1 ------------------------------------------------------------------------------------
 step "Unit tests (crypto, routing, engine-output parsing)"
 node --test worker/test/lib.test.mjs
 record_step "unit-tests-lib" "OK"
 
-# --- Step 2 -----------------------------------------------------------------------------------
+# --- Step 2 ------------------------------------------------------------------------------------
 step "Usage ledger (metering, absence, and the closed door)"
 node --test worker/test/ledger.test.mjs
 record_step "usage-ledger" "OK"
 
-# --- Step 3 -----------------------------------------------------------------------------------
+# --- Step 3 ------------------------------------------------------------------------------------
 step "Evidence store and cross-language digest"
 node --test worker/test/evidence-store.test.mjs
 record_step "evidence-store" "OK"
 
-# --- Step 4 -----------------------------------------------------------------------------------
+# --- Step 4 ------------------------------------------------------------------------------------
 step "Preflight — the values a stranger's repository gets to choose"
 node --test runner/test/preflight.test.mjs
 record_step "preflight" "OK"
 
-# --- Step 5 -----------------------------------------------------------------------------------
+# --- Step 5 ------------------------------------------------------------------------------------
 step "Secret distance — the step that runs client code holds no credential"
 bash runner/test/secret-distance.sh
 record_step "secret-distance" "OK"
 
-# --- Step 6 -----------------------------------------------------------------------------------
+# --- Step 6 ------------------------------------------------------------------------------------
 step "Mutation engine unit tests"
 python3 engine/move-mutate/test/test_movemutate.py
 record_step "mutation-engine-unit-tests" "OK"
 
-# --- Step 7 -----------------------------------------------------------------------------------
+# --- Step 7 ------------------------------------------------------------------------------------
 step "The action's closure does not reach into the worker"
 node --test runner/test/gates-output-mirror.test.mjs
 record_step "gates-output-mirror" "OK"
 
-# --- Step 8 -----------------------------------------------------------------------------------
+# --- Step 8 ------------------------------------------------------------------------------------
 step "The tamper tripwire trips in a tree with no worker/"
 bash runner/test/tripwire.test.sh
 record_step "tripwire" "OK"
 
-# --- Step 9 -----------------------------------------------------------------------------------
+# --- Step 9 ------------------------------------------------------------------------------------
 step "Runner wiring (measurement must not depend on reporting)"
 node --test runner/test/wiring.test.mjs
 record_step "runner-wiring" "OK"
 
-# --- Step 10 ----------------------------------------------------------------------------------
+# --- Step 10 -----------------------------------------------------------------------------------
 step "The published offer agrees with the published licence"
 node --test runner/test/offer-copy.test.mjs
 record_step "offer-copy" "OK"
 
-# --- Step 11 ----------------------------------------------------------------------------------
+# --- Step 11 -----------------------------------------------------------------------------------
+step "The mutation gate is described by what it delivers, not by a superlative"
+node --test runner/test/mutation-claim.test.mjs
+record_step "mutation-claim" "OK"
+
+# --- Step 12 -----------------------------------------------------------------------------------
 step "Evidence bundle unit tests"
 python3 engine/test/test_evidence_bundle.py
 record_step "evidence-bundle-unit-tests" "OK"
 
-# --- Step 11 ----------------------------------------------------------------------------------
+# --- Step 13 -----------------------------------------------------------------------------------
 step "Outcome classifier is not pipe-dependent"
 bash engine/test/classify.sh
 record_step "classifier-pipe-safety" "OK"
 
-# --- Step 12 ----------------------------------------------------------------------------------
+# --- Step 14 -----------------------------------------------------------------------------------
 step "The shipped engine is the engine it claims to be"
 bash engine/test/engine-drift.sh
 record_step "engine-drift" "OK"
 
-# --- Step 13 ----------------------------------------------------------------------------------
+# --- Step 15 -----------------------------------------------------------------------------------
 step "A digest that cannot be read is not a digest that disagreed"
 bash engine/test/digest-reader.sh
 record_step "digest-reader" "OK"
 
-# --- Step 14 ----------------------------------------------------------------------------------
+# --- Step 16 -----------------------------------------------------------------------------------
 step "The digest comparison accepts exactly the deployed and the intended digest"
 bash engine/test/digest-compare.sh
 record_step "digest-compare" "OK"
 
-# --- Step 15 ----------------------------------------------------------------------------------
+# --- Step 17 -----------------------------------------------------------------------------------
 step "A digest verdict does not accuse the source when the compiler moved"
 bash engine/test/toolchain-note.sh
 record_step "toolchain-note" "OK"
 
-# --- Step 16 ----------------------------------------------------------------------------------
+# --- Step 18 -----------------------------------------------------------------------------------
 step "The shipped engine measures a nested package"
 bash engine/test/app-path.sh
 record_step "app-path" "OK"
 
-# --- Step 17 ----------------------------------------------------------------------------------
+# --- Step 19 -----------------------------------------------------------------------------------
 step "Every shell script parses"
 for f in scripts/*.sh engine/ci/*.sh engine/move-mutate/*.sh engine/test/*.sh \
          runner/*.sh runner/test/*.sh; do
@@ -169,7 +174,7 @@ for f in scripts/*.sh engine/ci/*.sh engine/move-mutate/*.sh engine/test/*.sh \
 done
 record_step "shell-scripts-parse" "OK"
 
-# --- Step 18 ----------------------------------------------------------------------------------
+# --- Step 20 -----------------------------------------------------------------------------------
 step "Every JS entrypoint parses"
 node --check worker/src/index.js
 node --check worker/src/lib.js
@@ -181,6 +186,7 @@ node --check runner/preflight.mjs
 node --check runner/lib/preflight.mjs
 node --check runner/test/wiring.test.mjs
 node --check runner/test/offer-copy.test.mjs
+node --check runner/test/mutation-claim.test.mjs
 node --check worker/test/evidence-store.test.mjs
 
 node --check runner/test/preflight.test.mjs
@@ -190,7 +196,7 @@ node --check action/gates-output.mjs
 node --check runner/test/gates-output-mirror.test.mjs
 record_step "js-entrypoints-parse" "OK"
 
-# --- Step 19 ----------------------------------------------------------------------------------
+# --- Step 21 -----------------------------------------------------------------------------------
 step "Every module the worker imports is actually deployed"
 node -e '
   const fs = require("fs");
@@ -210,17 +216,17 @@ node -e '
 '
 record_step "worker-modules-deployed" "OK"
 
-# --- Step 20 ----------------------------------------------------------------------------------
+# --- Step 22 -----------------------------------------------------------------------------------
 step "Engine copies match their recorded hashes"
 sha256sum -c engine/CHECKSUMS
 record_step "engine-checksums" "OK"
 
-# --- Step 21 ----------------------------------------------------------------------------------
+# --- Step 23 -----------------------------------------------------------------------------------
 step "Every Python entrypoint parses"
 python3 -m py_compile runner/test/workflow-audit.py engine/move-mutate/lib/*.py
 record_step "python-entrypoints-parse" "OK"
 
-# --- Step 22 ----------------------------------------------------------------------------------
+# --- Step 24 -----------------------------------------------------------------------------------
 step "Manifest and workflow files are valid"
 node -e 'JSON.parse(require("fs").readFileSync("app/app-manifest.json", "utf8")); console.log("manifest: valid JSON")'
 node -e 'const fs = require("fs"); for (const f of fs.readdirSync(".github/workflows")) fs.readFileSync(".github/workflows/" + f, "utf8"); console.log("workflows: readable")'
@@ -234,9 +240,9 @@ SUMMARY="$(IFS='; '; echo "${STEP_LOG[*]}")"
 
 if [ "$SKIPPED" -gt 0 ]; then
   printf '\n\033[1m%s of %s steps ran; %s SKIPPED — see above. %ss.\033[0m\n' \
-    "$(( ${#STEP_LOG[@]} ))" 23 "$SKIPPED" "$elapsed"
+    "$(( ${#STEP_LOG[@]} ))" 24 "$SKIPPED" "$elapsed"
   record_gate pass "$elapsed" "pass-with-skips ($SKIPPED skipped): $SUMMARY"
 else
-  printf '\n\033[1mAll 23 self-gate steps passed in %ss.\033[0m\n' "$elapsed"
-  record_gate pass "$elapsed" "23/23 self-gate steps, all rc=0: $SUMMARY"
+  printf '\n\033[1mAll 24 self-gate steps passed in %ss.\033[0m\n' "$elapsed"
+  record_gate pass "$elapsed" "24/24 self-gate steps, all rc=0: $SUMMARY"
 fi

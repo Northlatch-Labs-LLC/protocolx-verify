@@ -106,6 +106,12 @@ jobs:
         # free row. Both are invisible to every other check here.
         run: node --test runner/test/offer-copy.test.mjs
 
+      - name: The mutation gate is described by what it delivers, not by a superlative
+        # Mutation testing for Move exists elsewhere as an installable command. Claiming
+        # the technique is ours is the oversell this gate will always invite, and the
+        # first reader to check would discount every other measured claim on the page.
+        run: node --test runner/test/mutation-claim.test.mjs
+
       - name: Evidence bundle unit tests
         # The bundle is the document an auditor is handed. These prove its
         # numbers are the engine's numbers, that its digest reproduces across runs and
@@ -177,6 +183,7 @@ jobs:
           node --check runner/lib/preflight.mjs
           node --check runner/test/wiring.test.mjs
           node --check runner/test/offer-copy.test.mjs
+          node --check runner/test/mutation-claim.test.mjs
           node --check worker/test/evidence-store.test.mjs
 
           node --check runner/test/preflight.test.mjs
