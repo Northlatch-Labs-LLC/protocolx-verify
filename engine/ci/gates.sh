@@ -5,7 +5,7 @@
 # on the next sync and cause the engine to differ from the tree it claims.
 # source_commit: 095fd383d981aee15ad3a49ab9d2683c511eb366
 # ─────────────────────────────────────────────────────────────────────────────
-# Built-by: @projectx.sui /|\
+# Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # gates — the ordered verification gates for a Move package, runnable locally or in CI.

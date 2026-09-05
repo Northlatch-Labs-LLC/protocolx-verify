@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+# Built-by: @projectx.sui · Co-authored-by: Claude
 #
 # engine-drift.sh — fail the build when the shipped engine is not the engine
 # it claims to be.

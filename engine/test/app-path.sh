@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\
+# Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # app-path — prove the SHIPPED ENGINE COPY, the one that produces the

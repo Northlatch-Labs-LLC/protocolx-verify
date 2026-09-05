@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // resolve-package — the Action's front gate for the one value a stranger's repository

@@ -1,4 +1,4 @@
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // gates-output — read the gate battery's own stdout back into per-gate verdicts.

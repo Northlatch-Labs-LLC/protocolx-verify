@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Built-by: @projectx.sui /|\
+# Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 """
 The evidence bundle's own test suite.

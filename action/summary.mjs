@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // summary — the Action's verdict step. Reads the gate battery's own output (the same

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\
+# Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # tripwire.test — prove the tamper tripwire TRIPS in a tree that has no worker/.

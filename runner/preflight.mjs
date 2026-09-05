@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // preflight — the runner's front gate. Everything here happens BEFORE any client code

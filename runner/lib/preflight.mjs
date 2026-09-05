@@ -1,4 +1,4 @@
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // preflight — everything we decide about a stranger's repository BEFORE any of its code

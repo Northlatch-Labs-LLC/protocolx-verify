@@ -1,4 +1,4 @@
-<!-- Built-by: @projectx.sui /|\ -->
+<!-- Built-by: @projectx.sui -->
 <!-- Co-authored-by: Kaela <kaela@projectxprotocol.dev> -->
 
 # LICENCE ARCHIVE — closed 2026-08-30
@@ -33,5 +33,5 @@ off the table until 2030-08-30.
 This directory is private. It is not part of the publishable runtime closure and must not
 be copied into a public tree.
 
-Built-by: @projectx.sui /|\
+Built-by: @projectx.sui
 Co-authored-by: Kaela <kaela@projectxprotocol.dev>

@@ -1,4 +1,4 @@
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // The runner's wiring, asserted as a structure rather than trusted as a habit.

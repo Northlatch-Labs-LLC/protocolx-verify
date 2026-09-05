@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\
+# Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # classify — guard the outcome classifier against the SIGPIPE regression.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Built-by: @projectx.sui /|\
+# Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
 # Sets one secret on the deployed worker, reading the VALUE from stdin so it never

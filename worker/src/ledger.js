@@ -1,4 +1,4 @@
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // THE USAGE LEDGER — per-repository usage metering.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // Mints a GitHub App installation token inside the runner workflow: App JWT (signed with

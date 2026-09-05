@@ -117,5 +117,5 @@ assumes it.
 
 ---
 
-Built-by: @projectx.sui /|\
+Built-by: @projectx.sui
 Co-authored-by: Kaela <kaela@projectxprotocol.dev>

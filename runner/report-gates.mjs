@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Built-by: @projectx.sui /|\
+// Built-by: @projectx.sui
 // Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 //
 // Turns the engine's output into GitHub check-run verdicts on the client's commit.
