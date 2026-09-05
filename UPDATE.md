@@ -12,6 +12,10 @@ superseded.
 
 ---
 
+## 2026-09-05 · The `/|\` glyph removed from every file header; main is `b86ca2f`, pushed
+
+On the owner's ruling of 2026-09-05 the three-character glyph after `@projectx.sui` in every `Built-by` header line is gone; the attribution stays. Scraped copies of these files rendered it as runs of escaped backslashes. One sed over every tracked text file, only header lines changed, `git grep` for the glyph returns nothing tracked. Landed on main by fast-forward from `chore/drop-the-mark` and pushed to GitHub; no deploy, because no rendered byte changed. The commit trailer is now `Built-by: @projectx.sui` then `Co-authored-by: Kaela <kaela@projectxprotocol.dev>`.
+
 ## 2026-09-03 · Gate run on this laptop, recorded in the estate ledger; main at `2ade54f`, clean
 
 **Who:** engineering agent on the chief technology officer's dispatch · **Where:** `main` at `2ade54f`, 0 dirty files, `main...origin/main` per the local ref (not fetched) · **Ref:** `work/state/gate-runs.json` id `protocolx-verify`; report `work/reports/2026-09-03-engineering-gates-for-every-solution.md`
