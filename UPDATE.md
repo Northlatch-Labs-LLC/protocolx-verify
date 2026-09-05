@@ -12,6 +12,61 @@ superseded.
 
 ---
 
+## 2026-09-05 · drift-watch: the deployment is watched after the verification, not only during it
+
+`runner/drift-watch.mjs` records what a package holds on chain at the moment somebody
+verified it, and fails on every later run when the chain no longer holds it. Two things are
+watched: the **bytecode** (per-module sha256, the package version and object digest, and the
+full linkage table) and the **authority** (the `UpgradeCap`'s package pointer, version,
+policy and current owner). It is wired into CI's `Self-gates` job and
+`scripts/run-self-gates.sh` as step 23.
+
+**What was already true, said before anything is claimed.** This repository's `digest` gate
+(`engine/ci/digest-guard.sh`) compares a build to `ci-expected-digest`, a hash **committed by
+hand beside `Move.toml`**. Before this branch, nothing in the tree read a chain: a search for
+any RPC, fullnode or on-chain reference across every shell, JS, Python, YAML and JSON file
+returned two hits, both of them the same comment about tree-shaking. The recorded digest was
+an assertion, never an observation.
+
+**And `sui client verify-source` already exists**, first party and free: it rebuilds a local
+package with the toolchain version it was published with and compares bytecode *and* linkage
+to the on-chain package. Point-in-time source verification is therefore not an empty space
+and this tool does not enter it. What that command cannot do is notice it needs running
+again — an `UpgradeCap` holder can publish new bytecode without touching the repository
+anybody verified. That decay is what drift-watch measures, and it is the honest form of the
+differentiator: **the watch, not the compare.**
+
+**Three verdicts, and the third is load-bearing.** 0 `match`, 1 `drift`, 2 `unmeasured`. 2 is
+never folded into 1, following the rule `engine/ci/digest-of-dump.py` already states: `drift`
+is an accusation about somebody's live deployment, and a timed-out endpoint, a truncated
+module page, a snapshot from another network or a cap caught between `authorize_upgrade` and
+`commit_upgrade` must not be able to make it. `check` takes its addresses from the snapshot
+and never from the command line, because a gate that can be aimed is not a gate.
+
+**GraphQL, by necessity.** JSON-RPC on public fullnodes is retired: `sui_getObject` against
+`fullnode.mainnet.sui.io` answers `Method not found. JSON-RPC on public fullnodes has been
+deprecated`. The client speaks to `https://graphql.mainnet.sui.io/graphql`, needs no key, and
+follows the module-list cursor — a page set that still says `hasNextPage` is refused rather
+than trimmed.
+
+**What ran.** All 23 self-gate steps pass here in 18s. The 42 drift-watch tests run offline
+from fixtures that are real mainnet responses captured on 2026-09-05, including the
+22-module MoveStdlib package read once whole and again in three pages so the cursor-following
+is cross-checked against the whole read; they still pass with `fetch`, `net.connect` and
+`dns.lookup` all sabotaged. The live path was exercised by hand against mainnet and produced
+all three exit codes: `MATCH` on a real package, `DRIFT` naming a real version move and a
+real module digest, and `UNMEASURED` against both an unreachable endpoint and the deprecated
+JSON-RPC one. 34 mutations were applied to the comparison, the parsers, the pagination and
+the command's exit codes; the first suite left four alive — an unsorted linkage, a
+zero-module package, a package and cap read from different chains, and a snapshot with no
+modules — and tests were added for all four before the run came back clean.
+
+**Not built, and named rather than faked.** MVR's on-chain audit-report metadata, which the
+recommendation also asks for: the Move Registry schema was not read as part of this work and
+nothing here covers it. Scheduling is also absent — this is a command with an exit code, not
+a daemon. And a snapshot of a package nobody verified is a faithful record of something
+nobody checked; step 1 of `runner/DRIFT-WATCH.md` is not optional.
+
 ## 2026-09-05 · The `/|\` glyph removed from every file header; main is `b86ca2f`, pushed
 
 On the owner's ruling of 2026-09-05 the three-character glyph after `@projectx.sui` in every `Built-by` header line is gone; the attribution stays. Scraped copies of these files rendered it as runs of escaped backslashes. One sed over every tracked text file, only header lines changed, `git grep` for the glyph returns nothing tracked. Landed on main by fast-forward from `chore/drop-the-mark` and pushed to GitHub; no deploy, because no rendered byte changed. The commit trailer is now `Built-by: @projectx.sui` then `Co-authored-by: Kaela <kaela@projectxprotocol.dev>`.

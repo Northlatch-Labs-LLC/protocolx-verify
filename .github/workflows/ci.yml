@@ -175,6 +175,9 @@ jobs:
           node --check action/summary.mjs
           node --check action/gates-output.mjs
           node --check runner/test/gates-output-mirror.test.mjs
+          node --check runner/drift-watch.mjs
+          node --check runner/lib/drift-watch.mjs
+          node --check runner/test/drift-watch.test.mjs
 
       - name: Every module the worker imports is actually deployed
         # scripts/deploy.sh uploads an explicit module list to the Cloudflare API. A new
@@ -209,3 +212,18 @@ jobs:
         run: |
           node -e 'JSON.parse(require("fs").readFileSync("app/app-manifest.json", "utf8")); console.log("manifest: valid JSON")'
           node -e 'const fs = require("fs"); for (const f of fs.readdirSync(".github/workflows")) fs.readFileSync(".github/workflows/" + f, "utf8"); console.log("workflows: readable")'
+
+      - name: drift-watch — an upgrade is drift, an unreachable endpoint is not
+        # The gate reads the chain, so the first question about it is what happens when the
+        # chain cannot be read. `drift` is an accusation about somebody's live deployment
+        # and a public endpoint having a bad minute must never be able to make it: every
+        # unreadable path answers `unmeasured` and exit 2, and several of these tests exist
+        # only to hold that line.
+        #
+        # Every fixture is a real response captured from Sui mainnet — a real package with
+        # its real bytecode, a real 0x2::package::UpgradeCap with its real owner and policy,
+        # and the real 22-module MoveStdlib read once whole and once in three pages so the
+        # cursor-following can be cross-checked against it. Nothing here opens a socket: a
+        # gate that goes red because mainnet was slow teaches the reader to press the button
+        # again, which is the habit this product exists to break.
+        run: node --test runner/test/drift-watch.test.mjs
