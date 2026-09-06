@@ -105,6 +105,20 @@ nobody checked; step 1 of `runner/DRIFT-WATCH.md` is not optional.
 ## 2026-09-05 · The `/|\` glyph removed from every file header; main is `b86ca2f`, pushed
 
 On the owner's ruling of 2026-09-05 the three-character glyph after `@projectx.sui` in every `Built-by` header line is gone; the attribution stays. Scraped copies of these files rendered it as runs of escaped backslashes. One sed over every tracked text file, only header lines changed, `git grep` for the glyph returns nothing tracked. Landed on main by fast-forward from `chore/drop-the-mark` and pushed to GitHub; no deploy, because no rendered byte changed. The commit trailer is now `Built-by: @projectx.sui` then `Co-authored-by: Kaela <kaela@projectxprotocol.dev>`.
+## 2026-09-04 · Security sweep: this file's convention corrected going forward
+
+Every entry above and below this one stands as written; law here is never edited, only
+superseded by a newer entry, and this is that entry. The estate's security desk swept every
+repository this company holds for material meant to stay on the local machine and found, among
+entries in this file, a decision quoted word for word and the paths of internal documents named
+directly. Neither belongs in a file whose only job is telling the next reader what changed, why,
+and what was verified.
+
+GOING FORWARD: an entry may state that a decision was made and by whom in role terms, never quote
+the decision's exact wording, and never name the path of an internal report, state file or desk
+tool. Where the fact of a decision matters to the next reader, it is stated as a fact, not as a
+quotation or a path. Findings sit on this repository's own `security/eyes-only` branch; the estate
+sweep's own report is a desk document and is not named here on purpose.
 
 ## 2026-09-03 · Gate run on this laptop, recorded in the estate ledger; main at `2ade54f`, clean
 
