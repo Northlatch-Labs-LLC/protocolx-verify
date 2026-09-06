@@ -12,6 +12,42 @@ superseded.
 
 ---
 
+## 2026-09-05 · The self-gates run on demand here; they find `main` red on engine drift
+
+`scripts/run-self-gates.sh` reruns, on a development machine, the same 22 steps that
+`.github/workflows/ci.yml` runs in its `Self-gates` job — same order, same commands, failing at the
+first failure the way `set -e` does under Actions. Until now the job existed only in CI and had been
+reproduced here exactly once, by hand, on 2026-09-03; nothing could repeat it per branch. A tool
+that measures other repositories' gates for a living and cannot rerun its own is not credible.
+
+The runner needs no ledger to work. `GATE_RECORDER` may point at a recorder to have runs written
+down; unset, every gate still runs and a failure still fails, and nothing is recorded. A clone with
+no development environment around it runs the same 22 steps.
+
+**Its first run found `main` red, and it has been red since `b86ca2f` on 2026-09-04.** Step 12,
+`engine/test/engine-drift.sh`, reports all 16 recorded engine files MODIFIED since sync. The cause
+is the glyph sweep in the entry below: it swept `Built-by` headers over every tracked text file,
+`engine/` included. But `engine/` is a generated downstream artifact of `verification-tools`, and
+its files carry `GENERATED FILE — DO NOT EDIT` for this exact reason. Editing them made the shipped
+engine differ from the canonical tree it names in `source_commit: 095fd383`, and neither
+`engine/CHECKSUMS` nor the hash block in `engine/ENGINE_PROVENANCE` was re-recorded. The drift gate
+did precisely its job; the sweep's claim that "only header lines changed" was true and still broke
+the guard, because for a vendored artifact a header line is a byte like any other.
+
+**What the drift is, measured rather than assumed:** all 16 files differ from their recorded hashes
+by exactly the glyph and by nothing else. Verified by restoring `/|\` in memory only, on both header
+forms present (`@projectx.sui` at end of line, and `@projectx.sui · Co-authored-by: Claude`), and
+re-hashing: 16 of 16 then match the recorded digest, 0 other differences, 0 missing. The engine is
+functionally the engine it claims to be. What is untrue is only its provenance record.
+
+**Not fixed here, deliberately.** The honest fix is at the source: sweep the glyph in
+`verification-tools` and re-run its `sync-engine.sh`. Re-recording the hashes in this repository
+would leave `ENGINE_PROVENANCE` asserting these files came from `095fd383` when they no longer
+byte-match it — a false provenance claim in the one product that sells provenance, and worse than a
+red gate. Restoring the glyph in `engine/` alone would go against the owner's ruling. The canonical
+repository was archived on 2026-09-02 and is not reachable from a working session, so the choice
+between those routes is the owner's and is recorded as an ask.
+
 ## 2026-09-05 · The `/|\` glyph removed from every file header; main is `b86ca2f`, pushed
 
 On the owner's ruling of 2026-09-05 the three-character glyph after `@projectx.sui` in every `Built-by` header line is gone; the attribution stays. Scraped copies of these files rendered it as runs of escaped backslashes. One sed over every tracked text file, only header lines changed, `git grep` for the glyph returns nothing tracked. Landed on main by fast-forward from `chore/drop-the-mark` and pushed to GitHub; no deploy, because no rendered byte changed. The commit trailer is now `Built-by: @projectx.sui` then `Co-authored-by: Kaela <kaela@projectxprotocol.dev>`.
