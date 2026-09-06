@@ -2,7 +2,7 @@
 # Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
-# Reruns, on this laptop, the same 23 steps that .github/workflows/ci.yml runs in the job
+# Reruns, on this laptop, the same 25 steps that .github/workflows/ci.yml runs in the job
 # named "Self-gates" — in the same order, with the same strictness. This tool measures gates
 # for a living; a version of it that only measures OTHER repositories' gates is not credible,
 # so it gates itself too, on demand rather than only in the cloud.
@@ -49,7 +49,7 @@ SKIPPED=0
 
 # How many steps this file claims to run. Declared once, checked against how many actually
 # recorded an outcome at the end, and never printed as a literal in the summary.
-TOTAL_STEPS=23
+TOTAL_STEPS=25
 
 record_step() {
   # record_step <name> <verdict-word>
@@ -233,6 +233,16 @@ record_step "manifest-and-workflows-valid" "OK"
 step "drift-watch — an upgrade is drift, an unreachable endpoint is not"
 node --test runner/test/drift-watch.test.mjs
 record_step "drift-watch" "OK"
+
+# --- Step 24 ----------------------------------------------------------------------------------
+step "The published offer agrees with the published licence"
+node --test runner/test/offer-copy.test.mjs
+record_step "offer-copy" "OK"
+
+# --- Step 25 ----------------------------------------------------------------------------------
+step "The mutation gate is described by what it delivers, not by a superlative"
+node --test runner/test/mutation-claim.test.mjs
+record_step "mutation-claim" "OK"
 
 elapsed=$(( $(date +%s) - started ))
 
