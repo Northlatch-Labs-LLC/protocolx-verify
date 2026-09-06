@@ -2,7 +2,7 @@
 # Built-by: @projectx.sui
 # Co-authored-by: Kaela <kaela@projectxprotocol.dev>
 #
-# Reruns, on this laptop, the same 22 steps that .github/workflows/ci.yml runs in the job
+# Reruns, on this laptop, the same 23 steps that .github/workflows/ci.yml runs in the job
 # named "Self-gates" — in the same order, with the same strictness. This tool measures gates
 # for a living; a version of it that only measures OTHER repositories' gates is not credible,
 # so it gates itself too, on demand rather than only in the cloud.
@@ -46,6 +46,10 @@ step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 # had actually said, and every pass it recorded was therefore evidence of nothing.
 declare -a STEP_LOG=()
 SKIPPED=0
+
+# How many steps this file claims to run. Declared once, checked against how many actually
+# recorded an outcome at the end, and never printed as a literal in the summary.
+TOTAL_STEPS=23
 
 record_step() {
   # record_step <name> <verdict-word>
@@ -182,6 +186,9 @@ node --check action/resolve-package.mjs
 node --check action/summary.mjs
 node --check action/gates-output.mjs
 node --check runner/test/gates-output-mirror.test.mjs
+node --check runner/drift-watch.mjs
+node --check runner/lib/drift-watch.mjs
+node --check runner/test/drift-watch.test.mjs
 record_step "js-entrypoints-parse" "OK"
 
 # --- Step 19 ----------------------------------------------------------------------------------
@@ -220,17 +227,36 @@ node -e 'JSON.parse(require("fs").readFileSync("app/app-manifest.json", "utf8"))
 node -e 'const fs = require("fs"); for (const f of fs.readdirSync(".github/workflows")) fs.readFileSync(".github/workflows/" + f, "utf8"); console.log("workflows: readable")'
 record_step "manifest-and-workflows-valid" "OK"
 
+# --- Step 23 ----------------------------------------------------------------------------------
+# Runs offline from fixtures captured off Sui mainnet, on purpose: mainnet is a live third
+# party, and a self-gate that can be reddened by somebody else's endpoint is not a gate.
+step "drift-watch — an upgrade is drift, an unreachable endpoint is not"
+node --test runner/test/drift-watch.test.mjs
+record_step "drift-watch" "OK"
+
 elapsed=$(( $(date +%s) - started ))
 
 # Build the summary from STEP_LOG — what actually ran and what it actually printed — never from
 # a string written in advance. See the header note above for why that rule exists.
 SUMMARY="$(IFS='; '; echo "${STEP_LOG[*]}")"
 
+RAN="${#STEP_LOG[@]}"
+
 if [ "$SKIPPED" -gt 0 ]; then
   printf '\n\033[1m%s of %s steps ran; %s SKIPPED — see above. %ss.\033[0m\n' \
-    "$(( ${#STEP_LOG[@]} ))" 22 "$SKIPPED" "$elapsed"
+    "$RAN" "$TOTAL_STEPS" "$SKIPPED" "$elapsed"
   record_gate pass "$elapsed" "pass-with-skips ($SKIPPED skipped): $SUMMARY"
 else
-  printf '\n\033[1mAll 22 self-gate steps passed in %ss.\033[0m\n' "$elapsed"
-  record_gate pass "$elapsed" "22/22 self-gate steps, all rc=0: $SUMMARY"
+  # The count printed is the number of steps that actually recorded an outcome, not a
+  # number typed above. The two are checked against each other rather than assumed equal:
+  # a step added to this file and never wired to a record_step would otherwise announce a
+  # full pass while one gate silently did not run.
+  if [ "$RAN" != "$TOTAL_STEPS" ]; then
+    printf '\n\033[1mSELF-GATE BOOKKEEPING ERROR: %s steps recorded an outcome, but this runner declares %s.\033[0m\n' \
+      "$RAN" "$TOTAL_STEPS" >&2
+    record_gate fail "$elapsed" "step count disagreed: $RAN recorded, $TOTAL_STEPS declared"
+    exit 1
+  fi
+  printf '\n\033[1mAll %s self-gate steps passed in %ss.\033[0m\n' "$RAN" "$elapsed"
+  record_gate pass "$elapsed" "$RAN/$TOTAL_STEPS self-gate steps, all rc=0: $SUMMARY"
 fi
