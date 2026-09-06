@@ -1,0 +1,109 @@
+# Built-by: @projectx.sui /|\ · Co-authored-by: Claude
+#
+# Template: verification gates for a Move package, per pull request.
+# Copy into a repo's .github/workflows/, set WORKDIR, and commit a ci-expected-digest beside
+# the package's Move.toml if it is deployed (see verification-tools/ci/digest-guard.sh).
+#
+# The full mutation run is deliberately NOT here — it costs one suite run per assert and
+# belongs in a scheduled or manually dispatched job. Deployment is not here either, ever:
+# contracts deploy through a multisig ceremony with a human saying "send".
+name: Contract gates
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WORKDIR: sui-contracts          # path to the directory containing Move.toml
+
+jobs:
+  gates:
+    name: Build, digest, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned toolchain: a floating version changes what compiles — and what digest the
+      # source builds to — without a line of this repository changing.
+      - name: Install Sui CLI
+        env:
+          SUI_VERSION: mainnet-v1.77.2
+        run: |
+          curl -sSL -o sui.tgz \
+            "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz"
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf sui.tgz -C "$HOME/.local/bin" --strip-components=1 || tar -xzf sui.tgz -C "$HOME/.local/bin"
+          chmod +x "$HOME/.local/bin/sui"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - run: sui --version
+
+      - name: Build
+        working-directory: ${{ env.WORKDIR }}
+        run: sui move build
+
+      # The deployed-drift tripwire: the source must build to the recorded package digest.
+      # Updating ci-expected-digest is a deliberate act that rides an intended upgrade commit.
+      - name: Digest guard
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          if [ ! -f ci-expected-digest ]; then
+            echo "no ci-expected-digest — package not marked as deployed; skipping"; exit 0
+          fi
+          EXPECTED="$(tr -d '[:space:]' < ci-expected-digest)"
+          # Build first, on its own, with stderr visible: a build failure must fail this step
+          # with the compiler's error in the log, not surface as a JSON parse error over empty
+          # stdout — that opaque shape is exactly how this gate's first real run died.
+          #
+          # --no-tree-shaking keeps the dump offline. Without it the dump tree-shakes the
+          # dependency list through RPC calls, and on a fresh runner that path produced an
+          # empty dump with exit code 0. Both dependencies are used, so shaking is a no-op
+          # here: the flag changes nothing about the digest, verified against
+          # ci-expected-digest with the same pinned CLI.
+          sui move build --dump-bytecode-as-base64 --no-tree-shaking > build-dump.json
+          echo "digest-guard: dump size $(wc -c < build-dump.json) bytes"
+          # The runner's dump is not clean JSON the way a local one is — parse from the first
+          # '{' so leading terminal noise cannot break the guard, and when no JSON object is
+          # found at all, print the head of the file verbatim so the log shows what the CLI
+          # actually wrote instead of a JSONDecodeError over invisible bytes.
+          ACTUAL="$(python3 - <<'PY'
+          import json, sys
+          raw = open('build-dump.json', 'rb').read()
+          start = raw.find(b'{')
+          if start < 0:
+              sys.stderr.write('digest-guard: no JSON object in dump; first 300 bytes: %r\n' % raw[:300])
+              sys.exit(1)
+          try:
+              dump = json.loads(raw[start:])
+          except Exception as e:
+              sys.stderr.write('digest-guard: dump not parseable as JSON (%s); first 300 bytes: %r\n' % (e, raw[:300]))
+              sys.exit(1)
+          print(bytes(dump['digest']).hex())
+          PY
+          )"
+          rm -f build-dump.json
+          if [ "$ACTUAL" = "$EXPECTED" ]; then
+            echo "digest-guard: OK ($ACTUAL)"
+          else
+            echo "digest-guard: MISMATCH — expected $EXPECTED, built $ACTUAL"
+            echo "If this is a deliberate upgrade, update ci-expected-digest in this commit."
+            exit 1
+          fi
+
+      - name: Move tests
+        working-directory: ${{ env.WORKDIR }}
+        run: sui move test
+
+      # Framework pin drift, where the repo carries the checker.
+      - name: Framework pin
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          if [ -x scripts/check-framework-pin.sh ]; then scripts/check-framework-pin.sh; else echo "no pin checker; skipping"; fi

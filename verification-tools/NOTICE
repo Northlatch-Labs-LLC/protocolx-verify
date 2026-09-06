@@ -1,0 +1,24 @@
+Copyright (c) 2026 Northlatch Labs LLC. All rights reserved.
+
+This repository and everything in it — the mutation engine (`move-mutate`), the drift
+watcher, the prover kit, the staging harness, the verification standard and the sync
+script — is proprietary software owned by Northlatch Labs LLC, a Wyoming limited
+liability company, Casper, Wyoming.
+
+No licence is granted by publication, by access, or by the absence of a LICENSE file.
+There is deliberately no LICENSE file in this repository: nothing here is offered under
+open-source or source-available terms, and the absence is a decision rather than an
+oversight.
+
+Customers of ProtocolX Verify buy a subscription to a service. They do not receive a
+licence to this code, and no part of it may be copied, modified, distributed, sublicensed
+or used to build a competing product.
+
+THIS REPOSITORY IS CANONICAL FOR THE ENGINE. The copy shipped at
+`protocolx-verify/engine/move-mutate/` is a downstream artifact produced by
+`sync-engine.sh` from this tree. It is not independently maintained and must never be
+hand-edited. See CANONICAL.md.
+
+Third-party dependencies retain their own licences. Nothing in this notice alters them.
+
+Contact: Northlatch Labs LLC, 5830 E 2nd St, Ste 7000 #38326, Casper, WY 82609, USA.
