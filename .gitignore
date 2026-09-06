@@ -1,6 +1,9 @@
 *.pem
 *.token
 *.key
+.env
+.env.*
+!.env.example
 node_modules/
 .DS_Store
 gates.log
