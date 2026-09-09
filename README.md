@@ -3,6 +3,8 @@
 
 # ProtocolX Verify
 
+Built and operated by **Northlatch Labs LLC**.
+
 > **What this repo is, among three that look alike.** This is **the product** — the GitHub Action,
 > the App, the worker, the thing customers install. Its `engine/` is a **downstream artifact**
 > synced from `verification-tools` and must never be hand-edited; see that repo's `CANONICAL.md`.
@@ -238,3 +240,7 @@ Contact: kaela@projectxprotocol.dev
 
 Built-by: @projectx.sui
 Co-authored-by: Kaela <kaela@projectxprotocol.dev>
+
+---
+
+**Northlatch Labs LLC** — [weir.social](https://weir.social) · [protocolx.io](https://protocolx.io)
