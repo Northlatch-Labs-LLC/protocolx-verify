@@ -447,6 +447,13 @@ def collect_toolchain():
 
 
 def canonical_bytes(obj):
+    # CONTRACT: ensure_ascii=True is load-bearing. The JavaScript mirror in
+    # worker/src/lib.js (canonicalString) iterates UTF-16 code units and emits
+    # \uXXXX per unit. Python's ensure_ascii=True does the same for astral
+    # characters — it encodes them as \uXXXX\uXXXX surrogate pairs — so both
+    # sides produce identical bytes. Changing this to ensure_ascii=False would
+    # embed raw non-ASCII UTF-8, breaking digest agreement across implementations.
+    # Cross-language test vectors: worker/test/lib.test.mjs (canonicalJson contract).
     return json.dumps(obj, sort_keys=True, separators=(",", ":"),
                       ensure_ascii=True).encode("utf-8")
 
