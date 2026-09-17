@@ -37,7 +37,8 @@
 // on 2026-08-30 and committed verbatim as worker/test/fixtures/installation-created
 // .delivery.json. That capture is also where `installation.created_at` being an ISO
 // 8601 string with an offset ("2026-08-28T16:53:32.000-07:00") comes from rather than
-// the epoch integer older references show — `asIsoTimestamp` accepts both and says so.
+// the epoch integer older references show — `asIsoTimestamp` accepts ISO strings and
+// epoch-millisecond numbers (callers must supply ms explicitly; no unit guessing).
 //
 // A NOTE ON SUBSCRIPTION: our App is not subscribed to `installation` in its event
 // list (its own payload shows events: check_suite, deployment, …, pull_request) and it
@@ -127,14 +128,9 @@ export function parseRunKey(key) {
 // anything else rather than inventing a date.
 export function asIsoTimestamp(value) {
   if (typeof value === 'number' && Number.isFinite(value)) {
-    // L-06: threshold 1e11 distinguishes epoch-seconds from epoch-ms.
-    // Current time in seconds ≈ 1.7e9 (well below 1e11); current time in ms ≈ 1.7e12
-    // (well above 1e11). The gap is ~60× current-epoch, so real timestamps are safe.
-    // Synthetic timestamps crafted near 1e11 ms (≈ year 2001 in ms, ≈ year 5138 in s)
-    // would be misclassified, but GitHub never sends timestamps that old.
-    // TODO(L-06): require callers to pass explicit units when/if the API is revised.
-    const ms = value < 1e11 ? value * 1000 : value;
-    const d = new Date(ms);
+    // Numbers must be epoch-milliseconds. Callers that receive epoch-seconds from
+    // older sources must multiply by 1000 before calling this function.
+    const d = new Date(value);
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
   }
   if (typeof value === 'string' && value.trim() !== '') {
