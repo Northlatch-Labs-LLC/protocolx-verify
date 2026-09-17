@@ -422,7 +422,7 @@ export async function recordRunBatch(env, { installationId, repository, now = Da
   if (!installationId || !repository) {
     return { recorded: false, reason: 'the batch carries no installation id or repository' };
   }
-  const id = deliveryId || `no-delivery-guid-${now}-${Math.random().toString(36).slice(2, 10)}`;
+  const id = (deliveryId != null && deliveryId !== '') ? deliveryId : `no-delivery-guid-${now}-${Math.random().toString(36).slice(2, 10)}`;
   try {
     await store.kv.put(runKey(installationId, repository, now, id), '1');
     return { recorded: true };
