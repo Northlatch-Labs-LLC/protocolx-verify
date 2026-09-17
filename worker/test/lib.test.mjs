@@ -29,6 +29,7 @@ import {
   installationTokenRequest,
   RUNNER_TOKEN_PERMISSIONS,
   WORKER_TOKEN_PERMISSIONS,
+  canonicalJson,
 } from '../src/lib.js';
 
 const te = new TextEncoder();
@@ -348,4 +349,57 @@ test('a malformed repository yields no repositories field rather than a wrong on
   // would fail in a way that invites someone to "fix" it by removing the scope.
   assert.equal('repositories' in installationTokenRequest('nameonly', RUNNER_TOKEN_PERMISSIONS), false);
   assert.equal('repositories' in installationTokenRequest(undefined, RUNNER_TOKEN_PERMISSIONS), false);
+});
+
+// --- canonicalJson encoding contract (cross-language test vectors) -------------------
+//
+// These vectors pin the exact bytes that engine/evidence/evidence_bundle.py produces
+// with json.dumps(..., ensure_ascii=True). The Python side MUST keep ensure_ascii=True;
+// changing it to False would embed raw UTF-8 bytes instead of \uXXXX escapes, and the
+// two implementations would produce different canonical strings for any payload that
+// contains non-ASCII characters — breaking signature verification on every such manifest.
+//
+// If these tests ever fail after a Python-side change, the Python change must be reverted
+// or the JS canonicalString must be updated to match the new Python encoding contract
+// BEFORE the change ships.
+
+test('canonicalJson: encoding contract matches Python json.dumps with ensure_ascii=True', () => {
+  // printable ASCII — no escaping needed
+  assert.equal(canonicalJson('hello'), '"hello"');
+
+  // JSON-mandatory escapes
+  assert.equal(canonicalJson('"quoted"'), '"\\"quoted\\""');
+  assert.equal(canonicalJson('back\\slash'), '"back\\\\slash"');
+  assert.equal(canonicalJson('tab\there'), '"tab\\there"');
+  assert.equal(canonicalJson('newline\nhere'), '"newline\\nhere"');
+
+  // U+0080–U+FFFF: Python ensure_ascii=True emits \uXXXX; JS code-unit iteration does too
+  assert.equal(canonicalJson('—'), '"\\u2014"');      // em dash
+  assert.equal(canonicalJson('é'), '"\\u00e9"');      // é (Latin small e with acute)
+
+  // Astral code points: Python ensure_ascii=True emits the surrogate pair \uXXXX\uXXXX.
+  // JS iterates UTF-16 code units and emits the same two \uXXXX escapes.
+  // If Python were changed to ensure_ascii=False, these would become raw UTF-8 bytes
+  // and the digests would diverge.
+  assert.equal(canonicalJson('\u{1F3AD}'), '"\\ud83c\\udfad"');   // 🎭 U+1F3AD
+  assert.equal(canonicalJson('\u{1F600}'), '"\\ud83d\\ude00"');   // 😀 U+1F600
+
+  // primitives
+  assert.equal(canonicalJson(null), 'null');
+  assert.equal(canonicalJson(true), 'true');
+  assert.equal(canonicalJson(false), 'false');
+  assert.equal(canonicalJson(42), '42');
+
+  // object keys sorted; non-ASCII key rejected
+  assert.equal(canonicalJson({ z: 1, a: 2 }), '{"a":2,"z":1}');
+  assert.throws(() => canonicalJson({ 'é': 1 }), /non-ASCII object key/);
+
+  // nested structure
+  assert.equal(
+    canonicalJson({ x: ['—', true, null], y: 0 }),
+    '{"x":["\\u2014",true,null],"y":0}',
+  );
+
+  // float rejected (Python and JS float repr differ)
+  assert.throws(() => canonicalJson(1.5), /non-integer/);
 });

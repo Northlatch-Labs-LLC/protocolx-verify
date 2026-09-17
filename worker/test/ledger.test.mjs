@@ -535,11 +535,11 @@ test('the ledger stores identifiers and counts, and nothing about the client\'s 
 // the plumbing the above rests on
 // ================================================================================
 
-test('asIsoTimestamp accepts both forms GitHub has shipped, and refuses to invent one', () => {
+test('asIsoTimestamp accepts ISO strings and epoch-ms numbers, refuses epoch-s and garbage', () => {
   // The form our live capture actually carries.
   assert.equal(asIsoTimestamp('2026-08-28T16:53:32.000-07:00'), '2026-08-28T23:53:32.000Z');
-  // The epoch-seconds form older payloads carry — the same instant, the other way round.
-  assert.equal(asIsoTimestamp(Date.parse('2026-08-28T23:53:32Z') / 1000), '2026-08-28T23:53:32.000Z');
+  // Epoch-milliseconds (the only numeric unit this function accepts).
+  assert.equal(asIsoTimestamp(Date.parse('2026-08-28T23:53:32Z')), '2026-08-28T23:53:32.000Z');
   for (const bad of [null, undefined, '', '   ', 'not a date', {}, NaN]) {
     assert.equal(asIsoTimestamp(bad), null);
   }
