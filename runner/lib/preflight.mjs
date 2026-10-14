@@ -140,7 +140,9 @@ function makeDep(name, body) {
 
 // --- the policy ----------------------------------------------------------------------
 
-const SAFE_HTTPS_URL = /^https:\/\/[A-Za-z0-9._~-]+(?::[0-9]{1,5})?\/[A-Za-z0-9._~\-/%]*$/;
+// M-07: % removed from path character class — percent-encoded traversal (%2F/%2E%2E)
+// passed this check before and reached git, which resolves the encoding.
+const SAFE_HTTPS_URL = /^https:\/\/[A-Za-z0-9._~-]+(?::[0-9]{1,5})?\/[A-Za-z0-9._~\/-]*$/;
 const SAFE_REV = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const PINNED_REV = /^[0-9a-f]{40}$/;
 

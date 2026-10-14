@@ -37,7 +37,8 @@
 // on 2026-08-30 and committed verbatim as worker/test/fixtures/installation-created
 // .delivery.json. That capture is also where `installation.created_at` being an ISO
 // 8601 string with an offset ("2026-08-28T16:53:32.000-07:00") comes from rather than
-// the epoch integer older references show — `asIsoTimestamp` accepts both and says so.
+// the epoch integer older references show — `asIsoTimestamp` accepts ISO strings and
+// epoch-millisecond numbers (callers must supply ms explicitly; no unit guessing).
 //
 // A NOTE ON SUBSCRIPTION: our App is not subscribed to `installation` in its event
 // list (its own payload shows events: check_suite, deployment, …, pull_request) and it
@@ -80,10 +81,20 @@ export const FAULT_PREFIX = 'fault:';
 export const installationKey = (id) => `${INSTALLATION_PREFIX}${id}`;
 export const runScope = (installationId, repository) => `${installationId}:${repository}#`;
 export const runPrefix = (installationId, repository) => `${RUN_PREFIX}${runScope(installationId, repository)}`;
+// M-09: validate deliveryId before embedding in a KV key. GitHub's X-GitHub-Delivery
+// is a UUID; a crafted ID containing /, \0, or `:` could collide with adjacent key
+// prefixes. Reject anything outside the safe alphanumeric+hyphen shape.
+const DELIVERY_ID_RE = /^[A-Za-z0-9][A-Za-z0-9-]{0,127}$/;
+
+export function safeDeliveryId(id) {
+  if (typeof id === 'string' && DELIVERY_ID_RE.test(id)) return id;
+  throw new Error(`ledger: deliveryId ${JSON.stringify(id)} is not a safe key segment`);
+}
+
 export const runKey = (installationId, repository, atMillis, deliveryId) =>
-  `${runPrefix(installationId, repository)}${String(atMillis).padStart(14, '0')}#${deliveryId}`;
+  `${runPrefix(installationId, repository)}${String(atMillis).padStart(14, '0')}#${safeDeliveryId(deliveryId)}`;
 export const faultKey = (installationId, repository, atMillis, deliveryId) =>
-  `${FAULT_PREFIX}${runScope(installationId, repository)}${String(atMillis).padStart(14, '0')}#${deliveryId}`;
+  `${FAULT_PREFIX}${runScope(installationId, repository)}${String(atMillis).padStart(14, '0')}#${safeDeliveryId(deliveryId)}`;
 
 // Read a run/fault key back into its parts. Returns null for anything unparseable —
 // an unreadable key is reported as an integrity fault, never silently dropped, because
@@ -117,9 +128,9 @@ export function parseRunKey(key) {
 // anything else rather than inventing a date.
 export function asIsoTimestamp(value) {
   if (typeof value === 'number' && Number.isFinite(value)) {
-    // Epoch seconds until the year 5138; anything larger is already milliseconds.
-    const ms = value < 1e11 ? value * 1000 : value;
-    const d = new Date(ms);
+    // Numbers must be epoch-milliseconds. Callers that receive epoch-seconds from
+    // older sources must multiply by 1000 before calling this function.
+    const d = new Date(value);
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
   }
   if (typeof value === 'string' && value.trim() !== '') {
@@ -407,7 +418,7 @@ export async function recordRunBatch(env, { installationId, repository, now = Da
   if (!installationId || !repository) {
     return { recorded: false, reason: 'the batch carries no installation id or repository' };
   }
-  const id = deliveryId || `no-delivery-guid-${now}-${Math.random().toString(36).slice(2, 10)}`;
+  const id = (deliveryId != null && deliveryId !== '') ? deliveryId : `no-delivery-guid-${now}-${Math.random().toString(36).slice(2, 10)}`;
   try {
     await store.kv.put(runKey(installationId, repository, now, id), '1');
     return { recorded: true };

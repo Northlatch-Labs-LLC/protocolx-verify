@@ -65,7 +65,33 @@ export function pemToPkcs8Bytes(pem) {
   }
   const m = pem.match(/-----BEGIN PRIVATE KEY-----([\s\S]*?)-----END PRIVATE KEY-----/);
   if (!m) throw new Error('Not a PEM private key: expected a "BEGIN PRIVATE KEY" (PKCS#8) block.');
-  return bytesFromBase64(m[1].replace(/\s+/g, ''));
+  const bytes = bytesFromBase64(m[1].replace(/\s+/g, ''));
+  // PKCS#8 PrivateKeyInfo is a DER SEQUENCE (tag 0x30). Validate tag and declared length
+  // so a malformed or truncated key fails here instead of causing a silent crypto panic downstream.
+  if (bytes.length < 2 || bytes[0] !== 0x30) {
+    throw new Error('Malformed PKCS#8 key: DER SEQUENCE tag (0x30) not found.');
+  }
+  let headerLen, contentLen;
+  if (bytes[1] < 0x80) {
+    headerLen = 2;
+    contentLen = bytes[1];
+  } else if (bytes[1] === 0x81) {
+    if (bytes.length < 3) throw new Error('Malformed PKCS#8 key: truncated DER length.');
+    headerLen = 3;
+    contentLen = bytes[2];
+  } else if (bytes[1] === 0x82) {
+    if (bytes.length < 4) throw new Error('Malformed PKCS#8 key: truncated DER length.');
+    headerLen = 4;
+    contentLen = (bytes[2] << 8) | bytes[3];
+  } else {
+    throw new Error('Malformed PKCS#8 key: unsupported DER length encoding.');
+  }
+  if (headerLen + contentLen !== bytes.length) {
+    throw new Error(
+      `Malformed PKCS#8 key: DER declared length ${contentLen} does not match data size ${bytes.length - headerLen}.`,
+    );
+  }
+  return bytes;
 }
 
 // The App JWT that authenticates us to GitHub as the App itself (RS256, 9-minute life,
@@ -105,6 +131,10 @@ export async function appJwt(appId, privateKeyPem, nowSeconds = Math.floor(Date.
 // a silent 422 that reads like a permissions problem.
 export const RUNNER_TOKEN_PERMISSIONS = { contents: 'read', checks: 'write', metadata: 'read' };
 export const WORKER_TOKEN_PERMISSIONS = { checks: 'write', metadata: 'read' };
+// Narrowest permission set for dispatching the runner workflow. actions:write is required
+// by GitHub's workflow dispatch endpoint; metadata:read is the minimum the App needs to
+// resolve the repository. No repo-content or checks access — dispatch only.
+export const DISPATCH_TOKEN_PERMISSIONS = { actions: 'write', metadata: 'read' };
 
 export function installationTokenRequest(repository, permissions) {
   const body = { permissions };

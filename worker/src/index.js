@@ -15,13 +15,13 @@
 
 import {
   verifyWebhookSignature, appJwt, routeEvent, GATES, checkName, timingSafeEqual,
-  canonicalDigest, installationTokenRequest, WORKER_TOKEN_PERMISSIONS,
+  canonicalDigest, installationTokenRequest, WORKER_TOKEN_PERMISSIONS, DISPATCH_TOKEN_PERMISSIONS,
 } from './lib.js';
 import {
   LEDGER_EVENTS, usageLedger, recordInstallationEvent, recordRunBatch, usageSnapshot,
 } from './ledger.js';
 
-const REQUIRED = ['GH_APP_ID', 'GH_WEBHOOK_SECRET', 'GH_APP_PRIVATE_KEY', 'RUNNER_REPO', 'RUNNER_TOKEN'];
+const REQUIRED = ['GH_APP_ID', 'GH_WEBHOOK_SECRET', 'GH_APP_PRIVATE_KEY', 'RUNNER_REPO'];
 const missingConfig = (env) => REQUIRED.filter((name) => !env[name]);
 
 // --- the usage read endpoint ---------------------------------------------------
@@ -258,6 +258,23 @@ async function storeEvidence(request, env, expectedHex) {
   return Response.json({ ok: true, digest: recomputed, stored: 'new', url: `${EVIDENCE_PREFIX}${key}` }, { status: 201 });
 }
 
+// Mint a short-lived GitHub App installation token scoped to RUNNER_REPO with the
+// minimum permissions needed for workflow dispatch. Replaces the static RUNNER_TOKEN
+// PAT (H-04): the resulting token expires in ~1 hour and cannot be widened by a thief.
+async function mintDispatchToken(env, jwt) {
+  const installation = await gh(`/repos/${env.RUNNER_REPO}/installation`, jwt);
+  const { token, expires_at } = await gh(
+    `/app/installations/${installation.id}/access_tokens`,
+    jwt,
+    {
+      method: 'POST',
+      body: JSON.stringify(installationTokenRequest(env.RUNNER_REPO, DISPATCH_TOKEN_PERMISSIONS)),
+    },
+  );
+  console.log(`dispatch-token: minted for ${env.RUNNER_REPO}, expires ${expires_at}`);
+  return token;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -365,7 +382,8 @@ export default {
 
     try {
       const workflow = env.RUNNER_WORKFLOW || 'verify-run.yml';
-      await gh(`/repos/${env.RUNNER_REPO}/actions/workflows/${workflow}/dispatches`, env.RUNNER_TOKEN, {
+      const dispatchToken = await mintDispatchToken(env, jwt);
+      await gh(`/repos/${env.RUNNER_REPO}/actions/workflows/${workflow}/dispatches`, dispatchToken, {
         method: 'POST',
         body: JSON.stringify({
           ref: env.RUNNER_REF || 'main',
